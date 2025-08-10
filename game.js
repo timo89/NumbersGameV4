@@ -42,6 +42,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.highScoreEl = document.getElementById('highScore');
         this.sumEl = document.getElementById('sum');
         this.lengthEl = document.getElementById('length');
+        this.pathInfoEl = document.querySelector('.path-info');
         
         // Controls
         this.pauseBtn = document.getElementById('pauseBtn');
@@ -53,6 +54,7 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Initialize graphics object for path lines
         this.pathGraphics = this.add.graphics();
+        this.pathGraphics.setDepth(1000); // Ensure path lines are above tiles
         
         // Initialize game
         this.generateGrid();
@@ -284,13 +286,12 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
-        // Set a custom dragging flag
-        this.isDragging = true;
-        this.dragStarted = true;
-        
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
         } else {
+            // Set a custom dragging flag only for path selection
+            this.isDragging = true;
+            this.dragStarted = true;
             this.startPath(tile.row, tile.col);
         }
         
@@ -310,13 +311,15 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerUp(pointer) {
-        if (this.isPaused || this.isFlipMode) return;
+        if (this.isPaused) return;
         
-        // Reset our custom dragging flag
-        this.isDragging = false;
-        this.dragStarted = false;
-        
-        this.finalizePath();
+        if (!this.isFlipMode) {
+            // Reset our custom dragging flag
+            this.isDragging = false;
+            this.dragStarted = false;
+            
+            this.finalizePath();
+        }
     }
 
     // Canvas mouse event handlers (alternative to Phaser pointer events)
@@ -326,12 +329,11 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
         
-        this.isDragging = true;
-        this.dragStarted = true;
-        
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
         } else {
+            this.isDragging = true;
+            this.dragStarted = true;
             this.startPath(tile.row, tile.col);
         }
         
@@ -353,12 +355,14 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasMouseUp(e) {
-        if (this.isPaused || this.isFlipMode) return;
+        if (this.isPaused) return;
         
-        this.isDragging = false;
-        this.dragStarted = false;
-        
-        this.finalizePath();
+        if (!this.isFlipMode) {
+            this.isDragging = false;
+            this.dragStarted = false;
+            
+            this.finalizePath();
+        }
         e.preventDefault();
     }
 
@@ -385,13 +389,17 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasTouchEnd(e) {
-        const mockEvent = { offsetX: 0, offsetY: 0, preventDefault: () => e.preventDefault() };
-        this.handleCanvasMouseUp(mockEvent);
+        if (!this.isFlipMode) {
+            const mockEvent = { offsetX: 0, offsetY: 0, preventDefault: () => e.preventDefault() };
+            this.handleCanvasMouseUp(mockEvent);
+        }
     }
 
     startPath(row, col) {
         this.clearPath();
         this.addToPath(row, col);
+        // Show path info when dragging starts
+        this.pathInfoEl.classList.add('dragging');
     }
 
     canAddToPath(row, col) {
@@ -431,6 +439,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.selectedPath = [];
         this.currentSum = 0;
         this.updatePathDisplay();
+        // Hide path info when clearing path
+        this.pathInfoEl.classList.remove('dragging');
     }
 
     updateTileDisplay() {
@@ -441,11 +451,14 @@ class NumbersGameScene extends Phaser.Scene {
                 const isSelected = this.isSelected(row, col);
                 const value = this.grid[row][col];
                 
-                if (isSelected) {
-                    tile.bg.setFillStyle(0xFFE082); // Yellow for selected
-                    tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border
-                    // Update text color for selected state
-                    tile.text.setColor('#374151'); // Dark text for light yellow background
+                if (isSelected && this.isDragging) {
+                    // Dim the tile by using a darker version of its original color
+                    const originalColor = this.getTileColor(value);
+                    const dimmedColor = this.darkenColor(originalColor, 0.7);
+                    tile.bg.setFillStyle(dimmedColor);
+                    tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border for selection
+                    // Adjust text color for dimmed background
+                    tile.text.setColor(this.getContrastTextColorString(value));
                 } else {
                     tile.bg.setFillStyle(this.getTileColor(value));
                     tile.bg.setStrokeStyle(1, 0x333333);
@@ -488,6 +501,9 @@ class NumbersGameScene extends Phaser.Scene {
 
     finalizePath() {
         if (this.selectedPath.length === 0) return;
+        
+        // Hide path info when dragging ends
+        this.pathInfoEl.classList.remove('dragging');
         
         if (this.isValidPath()) {
             this.processValidPath();
