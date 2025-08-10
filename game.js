@@ -1,5 +1,7 @@
-class NumbersGame {
+class NumbersGameScene extends Phaser.Scene {
     constructor() {
+        super({ key: 'NumbersGameScene' });
+        
         // Game constants
         this.GRID_SIZE = 6;
         this.TILE_SIZE = 80;
@@ -18,11 +20,20 @@ class NumbersGame {
         this.isFlipMode = false;
         this.gameStarted = false;
         
-        // Canvas and drawing
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
+        // Phaser objects
+        this.tileSprites = [];
+        this.pathGraphics = null;
         
-        // UI elements
+        // Timer
+        this.gameTimer = null;
+    }
+
+    preload() {
+        // No assets to preload for this simple game
+    }
+
+    create() {
+        // Initialize UI elements
         this.scoreEl = document.getElementById('score');
         this.levelEl = document.getElementById('level');
         this.timeEl = document.getElementById('time');
@@ -35,62 +46,31 @@ class NumbersGame {
         this.flipBtn = document.getElementById('flipBtn');
         this.resetBtn = document.getElementById('resetBtn');
         
-        // Input state
-        this.isMouseDown = false;
-        this.lastTile = null;
-        
-        // Timer
-        this.gameTimer = null;
-        
-        this.init();
-    }
-    
-    init() {
+        // Setup input and controls
         this.setupEventListeners();
+        
+        // Initialize graphics object for path lines
+        this.pathGraphics = this.add.graphics();
+        
+        // Initialize game
         this.generateGrid();
+        this.createTileSprites();
         this.updateDisplay();
-        this.draw();
         this.startGame();
     }
     
     setupEventListeners() {
-        // Mouse events
-        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-        
-        // Touch events for mobile
-        this.canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            this.handleMouseDown(mouseEvent);
-        });
-        
-        this.canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            this.handleMouseMove(mouseEvent);
-        });
-        
-        this.canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.handleMouseUp(e);
-        });
-        
         // Control buttons
         this.pauseBtn.addEventListener('click', () => this.togglePause());
         this.flipBtn.addEventListener('click', () => this.toggleFlipMode());
         this.resetBtn.addEventListener('click', () => this.resetGame());
+        
+        // Phaser input events
+        this.input.on('pointerdown', (pointer) => this.handlePointerDown(pointer));
+        this.input.on('pointermove', (pointer) => this.handlePointerMove(pointer));
+        this.input.on('pointerup', (pointer) => this.handlePointerUp(pointer));
     }
-    
+
     generateGrid() {
         this.grid = [];
         for (let row = 0; row < this.GRID_SIZE; row++) {
@@ -100,7 +80,7 @@ class NumbersGame {
             }
         }
     }
-    
+
     generateTileValue() {
         let value;
         do {
@@ -108,35 +88,96 @@ class NumbersGame {
         } while (value === 0);
         return value;
     }
-    
-    getTileAt(x, y) {
-        const rect = this.canvas.getBoundingClientRect();
-        const canvasX = x - rect.left;
-        const canvasY = y - rect.top;
+
+    createTileSprites() {
+        // Clear existing sprites
+        if (this.tileSprites.length > 0) {
+            this.tileSprites.forEach(row => {
+                row.forEach(tile => {
+                    if (tile.bg) tile.bg.destroy();
+                    if (tile.text) tile.text.destroy();
+                });
+            });
+        }
         
-        const col = Math.floor((canvasX - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
-        const row = Math.floor((canvasY - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
+        this.tileSprites = [];
+        
+        for (let row = 0; row < this.GRID_SIZE; row++) {
+            this.tileSprites[row] = [];
+            for (let col = 0; col < this.GRID_SIZE; col++) {
+                const x = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
+                const y = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
+                const value = this.grid[row][col];
+                
+                // Create tile background rectangle
+                const bg = this.add.rectangle(
+                    x + this.TILE_SIZE / 2, 
+                    y + this.TILE_SIZE / 2, 
+                    this.TILE_SIZE, 
+                    this.TILE_SIZE, 
+                    this.getTileColor(value)
+                );
+                bg.setStrokeStyle(1, 0x333333);
+                bg.setInteractive();
+                
+                // Create tile text
+                const text = this.add.text(
+                    x + this.TILE_SIZE / 2, 
+                    y + this.TILE_SIZE / 2, 
+                    value.toString(), 
+                    {
+                        fontSize: '24px',
+                        fontFamily: 'Arial',
+                        fontStyle: 'bold',
+                        color: '#ffffff',
+                        align: 'center'
+                    }
+                );
+                text.setOrigin(0.5, 0.5);
+                
+                // Store references with row/col data
+                bg.setData('row', row);
+                bg.setData('col', col);
+                text.setData('row', row);
+                text.setData('col', col);
+                
+                this.tileSprites[row][col] = { bg, text, row, col };
+            }
+        }
+    }
+
+    getTileColor(value) {
+        if (value > 0) {
+            return 0x4CAF50; // Green for positive
+        } else {
+            return 0xf44336; // Red for negative
+        }
+    }
+
+    getTileAt(x, y) {
+        const col = Math.floor((x - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
+        const row = Math.floor((y - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
         
         if (row >= 0 && row < this.GRID_SIZE && col >= 0 && col < this.GRID_SIZE) {
             // Check if click is within tile bounds
             const tileX = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
             const tileY = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
             
-            if (canvasX >= tileX && canvasX <= tileX + this.TILE_SIZE &&
-                canvasY >= tileY && canvasY <= tileY + this.TILE_SIZE) {
+            if (x >= tileX && x <= tileX + this.TILE_SIZE &&
+                y >= tileY && y <= tileY + this.TILE_SIZE) {
                 return { row, col };
             }
         }
         return null;
     }
-    
-    handleMouseDown(e) {
+
+    handlePointerDown(pointer) {
         if (this.isPaused) return;
         
-        const tile = this.getTileAt(e.clientX, e.clientY);
+        const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
-        this.isMouseDown = true;
+        this.input.setDragState(pointer, true);
         
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
@@ -144,33 +185,33 @@ class NumbersGame {
             this.startPath(tile.row, tile.col);
         }
         
-        this.draw();
+        this.updateTileDisplay();
     }
-    
-    handleMouseMove(e) {
-        if (this.isPaused || this.isFlipMode || !this.isMouseDown) return;
+
+    handlePointerMove(pointer) {
+        if (this.isPaused || this.isFlipMode || !pointer.isDragging) return;
         
-        const tile = this.getTileAt(e.clientX, e.clientY);
+        const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
-            this.draw();
+            this.updateTileDisplay();
         }
     }
-    
-    handleMouseUp(e) {
+
+    handlePointerUp(pointer) {
         if (this.isPaused || this.isFlipMode) return;
         
-        this.isMouseDown = false;
+        this.input.setDragState(pointer, false);
         this.finalizePath();
     }
-    
+
     startPath(row, col) {
         this.clearPath();
         this.addToPath(row, col);
     }
-    
+
     canAddToPath(row, col) {
         // Check if tile is already in path
         if (this.selectedPath.some(tile => tile.row === row && tile.col === col)) {
@@ -188,28 +229,77 @@ class NumbersGame {
         // Only orthogonally adjacent (not diagonal)
         return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
     }
-    
+
     addToPath(row, col) {
         this.selectedPath.push({ row, col, value: this.grid[row][col] });
         this.updateCurrentSum();
         this.updatePathDisplay();
     }
-    
+
     updateCurrentSum() {
         this.currentSum = this.selectedPath.reduce((sum, tile) => sum + tile.value, 0);
     }
-    
+
     updatePathDisplay() {
         this.sumEl.textContent = this.currentSum;
         this.lengthEl.textContent = this.selectedPath.length;
     }
-    
+
     clearPath() {
         this.selectedPath = [];
         this.currentSum = 0;
         this.updatePathDisplay();
     }
-    
+
+    updateTileDisplay() {
+        // Update tile appearances
+        for (let row = 0; row < this.GRID_SIZE; row++) {
+            for (let col = 0; col < this.GRID_SIZE; col++) {
+                const tile = this.tileSprites[row][col];
+                const isSelected = this.isSelected(row, col);
+                const value = this.grid[row][col];
+                
+                if (isSelected) {
+                    tile.bg.setFillStyle(0xFFE082); // Yellow for selected
+                    tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border
+                } else {
+                    tile.bg.setFillStyle(this.getTileColor(value));
+                    tile.bg.setStrokeStyle(1, 0x333333);
+                }
+            }
+        }
+        
+        // Draw path lines
+        this.drawPathLines();
+    }
+
+    drawPathLines() {
+        this.pathGraphics.clear();
+        
+        if (this.selectedPath.length > 1) {
+            this.pathGraphics.lineStyle(4, 0xFF9800, 1);
+            
+            for (let i = 0; i < this.selectedPath.length; i++) {
+                const tile = this.selectedPath[i];
+                const x = this.CANVAS_PADDING + tile.col * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
+                const y = this.CANVAS_PADDING + tile.row * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
+                
+                if (i === 0) {
+                    this.pathGraphics.beginPath();
+                    this.pathGraphics.moveTo(x, y);
+                } else {
+                    this.pathGraphics.lineTo(x, y);
+                }
+            }
+            
+            this.pathGraphics.strokePath();
+        }
+    }
+
+    isSelected(row, col) {
+        return this.selectedPath.some(tile => tile.row === row && tile.col === col);
+    }
+
     finalizePath() {
         if (this.selectedPath.length === 0) return;
         
@@ -219,11 +309,11 @@ class NumbersGame {
             this.processInvalidPath();
         }
     }
-    
+
     isValidPath() {
         return this.currentSum !== 0 && this.currentSum % 5 === 0;
     }
-    
+
     processValidPath() {
         // Calculate score (absolute value of sum)
         const pathScore = Math.abs(this.currentSum);
@@ -247,18 +337,18 @@ class NumbersGame {
         // Update displays
         this.updateDisplay();
         this.clearPath();
-        this.draw();
+        this.createTileSprites();
     }
-    
+
     processInvalidPath() {
         // Show failure feedback
         this.showFeedback('Invalid path!', 'failure');
         
         // Clear the path
         this.clearPath();
-        this.draw();
+        this.updateTileDisplay();
     }
-    
+
     showFeedback(message, type) {
         const feedback = document.createElement('div');
         feedback.className = `feedback ${type}`;
@@ -266,16 +356,18 @@ class NumbersGame {
         document.body.appendChild(feedback);
         
         setTimeout(() => {
-            document.body.removeChild(feedback);
+            if (document.body.contains(feedback)) {
+                document.body.removeChild(feedback);
+            }
         }, 1000);
     }
-    
+
     clearSelectedTiles() {
         this.selectedPath.forEach(tile => {
             this.grid[tile.row][tile.col] = this.generateTileValue();
         });
     }
-    
+
     addRandomTiles() {
         const tilesToReplace = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
         
@@ -291,17 +383,24 @@ class NumbersGame {
             this.grid[row][col] = this.generateTileValue();
         }
     }
-    
+
     flipTile(row, col) {
         this.grid[row][col] = -this.grid[row][col];
-        this.draw();
+        this.tileSprites[row][col].text.setText(this.grid[row][col].toString());
+        this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(this.grid[row][col]));
     }
-    
+
     togglePause() {
         this.isPaused = !this.isPaused;
         this.pauseBtn.textContent = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
+        
+        if (this.isPaused) {
+            this.scene.pause();
+        } else {
+            this.scene.resume();
+        }
     }
-    
+
     toggleFlipMode() {
         this.isFlipMode = !this.isFlipMode;
         this.flipBtn.textContent = this.isFlipMode ? '🎯 Select Mode' : '🔄 Flip Mode';
@@ -309,10 +408,10 @@ class NumbersGame {
         
         if (this.isFlipMode) {
             this.clearPath();
-            this.draw();
+            this.updateTileDisplay();
         }
     }
-    
+
     resetGame() {
         this.clearPath();
         this.score = 0;
@@ -327,121 +426,76 @@ class NumbersGame {
         this.flipBtn.textContent = '🔄 Flip Mode';
         this.flipBtn.classList.remove('active');
         
+        // Stop timer
+        if (this.gameTimer) {
+            this.gameTimer.destroy();
+            this.gameTimer = null;
+        }
+        
         // Regenerate grid
         this.generateGrid();
+        this.createTileSprites();
         this.updateDisplay();
-        this.draw();
         
         this.startGame();
     }
-    
+
     updateDisplay() {
         this.scoreEl.textContent = this.score;
         this.levelEl.textContent = this.level;
         this.highScoreEl.textContent = this.highScore;
         this.timeEl.textContent = this.formatTime(this.gameTime);
     }
-    
+
     formatTime(seconds) {
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
-    
+
     startGame() {
         if (this.gameStarted) return;
         
         this.gameStarted = true;
         this.gameTime = 0;
         
-        // Start timer
-        this.gameTimer = setInterval(() => {
-            if (!this.isPaused) {
-                this.gameTime++;
-                this.timeEl.textContent = this.formatTime(this.gameTime);
-                
-                // Increase level every 60 seconds
-                if (this.gameTime % 60 === 0) {
-                    this.level++;
-                    this.levelEl.textContent = this.level;
+        // Start timer using Phaser's timer
+        this.gameTimer = this.time.addEvent({
+            delay: 1000,
+            loop: true,
+            callback: () => {
+                if (!this.isPaused) {
+                    this.gameTime++;
+                    this.timeEl.textContent = this.formatTime(this.gameTime);
+                    
+                    // Increase level every 60 seconds
+                    if (this.gameTime % 60 === 0) {
+                        this.level++;
+                        this.levelEl.textContent = this.level;
+                    }
                 }
             }
-        }, 1000);
-    }
-    
-    getTileColor(value) {
-        if (value > 0) {
-            // Positive tiles - green shades
-            return '#4CAF50';
-        } else {
-            // Negative tiles - red shades
-            return '#f44336';
-        }
-    }
-    
-    isSelected(row, col) {
-        return this.selectedPath.some(tile => tile.row === row && tile.col === col);
-    }
-    
-    draw() {
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw grid
-        for (let row = 0; row < this.GRID_SIZE; row++) {
-            for (let col = 0; col < this.GRID_SIZE; col++) {
-                const x = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
-                const y = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
-                const value = this.grid[row][col];
-                const isSelected = this.isSelected(row, col);
-                
-                // Draw tile background
-                this.ctx.fillStyle = isSelected ? '#FFE082' : this.getTileColor(value);
-                this.ctx.fillRect(x, y, this.TILE_SIZE, this.TILE_SIZE);
-                
-                // Draw tile border
-                this.ctx.strokeStyle = isSelected ? '#FF9800' : '#333';
-                this.ctx.lineWidth = isSelected ? 3 : 1;
-                this.ctx.strokeRect(x, y, this.TILE_SIZE, this.TILE_SIZE);
-                
-                // Draw tile value
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = 'bold 24px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                this.ctx.fillText(
-                    value.toString(),
-                    x + this.TILE_SIZE / 2,
-                    y + this.TILE_SIZE / 2
-                );
-            }
-        }
-        
-        // Draw path lines
-        if (this.selectedPath.length > 1) {
-            this.ctx.strokeStyle = '#FF9800';
-            this.ctx.lineWidth = 4;
-            this.ctx.lineCap = 'round';
-            this.ctx.beginPath();
-            
-            for (let i = 0; i < this.selectedPath.length; i++) {
-                const tile = this.selectedPath[i];
-                const x = this.CANVAS_PADDING + tile.col * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
-                const y = this.CANVAS_PADDING + tile.row * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
-                
-                if (i === 0) {
-                    this.ctx.moveTo(x, y);
-                } else {
-                    this.ctx.lineTo(x, y);
-                }
-            }
-            
-            this.ctx.stroke();
-        }
+        });
     }
 }
 
+// Phaser game configuration
+const config = {
+    type: Phaser.AUTO,
+    width: 530,
+    height: 530,
+    parent: 'gameContainer',
+    backgroundColor: '#ffffff',
+    scene: NumbersGameScene,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: false
+        }
+    }
+};
+
 // Start the game when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new NumbersGame();
+    new Phaser.Game(config);
 });
