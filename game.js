@@ -22,6 +22,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.isDragging = false;
         this.dragStarted = false;
         this.handledByPhaser = false;
+        this.lastFlipTime = 0;
+        this.flipDebounceMs = 100;
         
         // Phaser objects
         this.tileSprites = [];
@@ -287,8 +289,9 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
-        // Prevent double handling by canvas events
+        // Set flag to prevent canvas events from processing the same interaction
         this.handledByPhaser = true;
+        setTimeout(() => { this.handledByPhaser = false; }, 50);
         
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
@@ -332,7 +335,6 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Check if this event was already handled by Phaser
         if (this.handledByPhaser) {
-            this.handledByPhaser = false;
             return;
         }
         
@@ -591,8 +593,16 @@ class NumbersGameScene extends Phaser.Scene {
             });
         });
         
-        // When all animations complete, clear tiles and regenerate
-        Promise.all(animationPromises).then(() => {
+        // Add a timeout fallback to prevent getting stuck
+        const timeoutPromise = new Promise((resolve) => {
+            setTimeout(resolve, 600); // Give 200ms extra after animation duration
+        });
+        
+        // Use Promise.race to ensure we don't get stuck waiting for animations
+        Promise.race([
+            Promise.all(animationPromises),
+            timeoutPromise
+        ]).then(() => {
             // Clear selected tiles and generate new ones
             this.clearSelectedTiles();
             
@@ -636,6 +646,15 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     flipTile(row, col) {
+        const currentTime = Date.now();
+        
+        // Debounce rapid flip attempts to prevent double-clicking
+        if (currentTime - this.lastFlipTime < this.flipDebounceMs) {
+            return;
+        }
+        
+        this.lastFlipTime = currentTime;
+        
         this.grid[row][col] = -this.grid[row][col];
         const newValue = this.grid[row][col];
         this.tileSprites[row][col].text.setText(newValue.toString());
