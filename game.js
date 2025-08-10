@@ -114,8 +114,8 @@ class NumbersGameScene extends Phaser.Scene {
         if (this.tileSprites.length > 0) {
             this.tileSprites.forEach(row => {
                 row.forEach(tile => {
-                    if (tile.bg) tile.bg.destroy();
-                    if (tile.text) tile.text.destroy();
+                    if (tile && tile.bg) tile.bg.destroy();
+                    if (tile && tile.text) tile.text.destroy();
                 });
             });
         }
@@ -128,6 +128,12 @@ class NumbersGameScene extends Phaser.Scene {
                 const x = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
                 const y = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
                 const value = this.grid[row][col];
+                
+                // If tile is empty (null), create invisible placeholder
+                if (value === null) {
+                    this.tileSprites[row][col] = null;
+                    continue;
+                }
                 
                 // Create tile background rectangle
                 const bg = this.add.rectangle(
@@ -289,6 +295,9 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
+        
         // Set flag to prevent canvas events from processing the same interaction
         this.handledByPhaser = true;
         setTimeout(() => { this.handledByPhaser = false; }, 50);
@@ -310,6 +319,9 @@ class NumbersGameScene extends Phaser.Scene {
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
+        
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
@@ -341,6 +353,9 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
         
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
+        
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
         } else {
@@ -358,6 +373,9 @@ class NumbersGameScene extends Phaser.Scene {
         
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
+        
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
@@ -463,6 +481,11 @@ class NumbersGameScene extends Phaser.Scene {
                 const isSelected = this.isSelected(row, col);
                 const value = this.grid[row][col];
                 
+                // Skip if tile is empty (null)
+                if (tile === null || value === null) {
+                    continue;
+                }
+                
                 if (isSelected && this.isDragging) {
                     // Dim the tile by using a darker version of its original color
                     const originalColor = this.getTileColor(value);
@@ -529,6 +552,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     processValidPath() {
+        // Clear the path line immediately after win
+        this.pathGraphics.clear();
+        
         // Calculate score (absolute value of sum)
         const pathScore = Math.abs(this.currentSum);
         this.score += pathScore;
@@ -617,31 +643,32 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     addRandomTilesOnEmptySpaces() {
-        // Get positions of tiles that were just cleared
-        const emptyPositions = this.selectedPath.map(tile => ({ row: tile.row, col: tile.col }));
+        // Get all empty positions (including recently cleared tiles)
+        const emptyPositions = [];
+        for (let row = 0; row < this.GRID_SIZE; row++) {
+            for (let col = 0; col < this.GRID_SIZE; col++) {
+                if (this.grid[row][col] === null) {
+                    emptyPositions.push({ row, col });
+                }
+            }
+        }
         
-        // Generate 2-3 random tiles on other empty spaces
-        const additionalTiles = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
+        // Generate 2-3 random tiles only
+        const tilesToGenerate = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
+        const tilesToPlace = Math.min(tilesToGenerate, emptyPositions.length);
         
-        for (let i = 0; i < additionalTiles; i++) {
-            let row, col;
-            let attempts = 0;
-            
-            // Try to find a position that's not one of the recently cleared tiles
-            do {
-                row = Math.floor(Math.random() * this.GRID_SIZE);
-                col = Math.floor(Math.random() * this.GRID_SIZE);
-                attempts++;
-            } while (attempts < 10 && emptyPositions.some(pos => pos.row === row && pos.col === col));
-            
-            // Generate new value for this position
-            this.grid[row][col] = this.generateTileValue();
+        // Shuffle empty positions and select random ones for new tiles
+        for (let i = 0; i < tilesToPlace; i++) {
+            const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+            const position = emptyPositions.splice(randomIndex, 1)[0];
+            this.grid[position.row][position.col] = this.generateTileValue();
         }
     }
 
     clearSelectedTiles() {
+        // Clear selected tiles (set to null so they become empty spaces)
         this.selectedPath.forEach(tile => {
-            this.grid[tile.row][tile.col] = this.generateTileValue();
+            this.grid[tile.row][tile.col] = null;
         });
     }
 
@@ -650,6 +677,11 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Debounce rapid flip attempts to prevent double-clicking
         if (currentTime - this.lastFlipTime < this.flipDebounceMs) {
+            return;
+        }
+        
+        // Don't flip empty tiles
+        if (this.grid[row][col] === null) {
             return;
         }
         
