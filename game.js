@@ -540,16 +540,8 @@ class NumbersGameScene extends Phaser.Scene {
         // Show success feedback
         this.showFeedback('Success!', 'success');
         
-        // Clear selected tiles and generate new ones
-        this.clearSelectedTiles();
-        
-        // Add 2-3 new random tiles
-        this.addRandomTiles();
-        
-        // Update displays
-        this.updateDisplay();
-        this.clearPath();
-        this.createTileSprites();
+        // Animate tiles out then clear and regenerate
+        this.animateSelectedTilesOut();
     }
 
     processInvalidPath() {
@@ -574,26 +566,73 @@ class NumbersGameScene extends Phaser.Scene {
         }, 1000);
     }
 
+    animateSelectedTilesOut() {
+        const tilesToAnimate = [];
+        
+        // Collect tiles to animate
+        this.selectedPath.forEach(tile => {
+            const tileSprite = this.tileSprites[tile.row][tile.col];
+            tilesToAnimate.push(tileSprite);
+        });
+        
+        // Create animation promises for all tiles
+        const animationPromises = tilesToAnimate.map(tileSprite => {
+            return new Promise((resolve) => {
+                // Animate both background and text simultaneously
+                this.tweens.add({
+                    targets: [tileSprite.bg, tileSprite.text],
+                    alpha: 0,
+                    scaleX: 0.3,
+                    scaleY: 0.3,
+                    duration: 400,
+                    ease: 'Back.easeIn',
+                    onComplete: resolve
+                });
+            });
+        });
+        
+        // When all animations complete, clear tiles and regenerate
+        Promise.all(animationPromises).then(() => {
+            // Clear selected tiles and generate new ones
+            this.clearSelectedTiles();
+            
+            // Add 2-3 new random tiles on empty spaces
+            this.addRandomTilesOnEmptySpaces();
+            
+            // Update displays
+            this.updateDisplay();
+            this.clearPath();
+            this.createTileSprites();
+        });
+    }
+
+    addRandomTilesOnEmptySpaces() {
+        // Get positions of tiles that were just cleared
+        const emptyPositions = this.selectedPath.map(tile => ({ row: tile.row, col: tile.col }));
+        
+        // Generate 2-3 random tiles on other empty spaces
+        const additionalTiles = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
+        
+        for (let i = 0; i < additionalTiles; i++) {
+            let row, col;
+            let attempts = 0;
+            
+            // Try to find a position that's not one of the recently cleared tiles
+            do {
+                row = Math.floor(Math.random() * this.GRID_SIZE);
+                col = Math.floor(Math.random() * this.GRID_SIZE);
+                attempts++;
+            } while (attempts < 10 && emptyPositions.some(pos => pos.row === row && pos.col === col));
+            
+            // Generate new value for this position
+            this.grid[row][col] = this.generateTileValue();
+        }
+    }
+
     clearSelectedTiles() {
         this.selectedPath.forEach(tile => {
             this.grid[tile.row][tile.col] = this.generateTileValue();
         });
-    }
-
-    addRandomTiles() {
-        const tilesToReplace = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
-        
-        for (let i = 0; i < tilesToReplace; i++) {
-            const row = Math.floor(Math.random() * this.GRID_SIZE);
-            const col = Math.floor(Math.random() * this.GRID_SIZE);
-            
-            // Skip if this tile was just cleared
-            if (this.selectedPath.some(tile => tile.row === row && tile.col === col)) {
-                continue;
-            }
-            
-            this.grid[row][col] = this.generateTileValue();
-        }
     }
 
     flipTile(row, col) {
