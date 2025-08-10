@@ -71,6 +71,19 @@ class NumbersGameScene extends Phaser.Scene {
         this.input.on('pointerdown', (pointer) => this.handlePointerDown(pointer));
         this.input.on('pointermove', (pointer) => this.handlePointerMove(pointer));
         this.input.on('pointerup', (pointer) => this.handlePointerUp(pointer));
+        
+        // Alternative: Add direct mouse/touch events to the canvas
+        const canvas = this.sys.game.canvas;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+        canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e));
+        canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+        
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', (e) => this.handleCanvasTouchStart(e));
+        canvas.addEventListener('touchmove', (e) => this.handleCanvasTouchMove(e));
+        canvas.addEventListener('touchend', (e) => this.handleCanvasTouchEnd(e));
     }
 
     generateGrid() {
@@ -266,11 +279,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
-        console.log('Pointer down:', pointer.x, pointer.y, 'isPaused:', this.isPaused);
         if (this.isPaused) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
-        console.log('Tile found:', tile);
         if (!tile) return;
         
         // Set a custom dragging flag
@@ -278,10 +289,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.dragStarted = true;
         
         if (this.isFlipMode) {
-            console.log('Flipping tile:', tile.row, tile.col);
             this.flipTile(tile.row, tile.col);
         } else {
-            console.log('Starting path:', tile.row, tile.col);
             this.startPath(tile.row, tile.col);
         }
         
@@ -289,21 +298,18 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerMove(pointer) {
-        console.log('Pointer move:', pointer.x, pointer.y, 'isDragging:', this.isDragging);
         if (this.isPaused || this.isFlipMode || !this.isDragging) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
-            console.log('Adding to path:', tile.row, tile.col);
             this.addToPath(tile.row, tile.col);
             this.updateTileDisplay();
         }
     }
 
     handlePointerUp(pointer) {
-        console.log('Pointer up:', pointer.x, pointer.y);
         if (this.isPaused || this.isFlipMode) return;
         
         // Reset our custom dragging flag
@@ -311,6 +317,76 @@ class NumbersGameScene extends Phaser.Scene {
         this.dragStarted = false;
         
         this.finalizePath();
+    }
+
+    // Canvas mouse event handlers (alternative to Phaser pointer events)
+    handleCanvasMouseDown(e) {
+        if (this.isPaused) return;
+        
+        const tile = this.getTileAt(e.offsetX, e.offsetY);
+        if (!tile) return;
+        
+        this.isDragging = true;
+        this.dragStarted = true;
+        
+        if (this.isFlipMode) {
+            this.flipTile(tile.row, tile.col);
+        } else {
+            this.startPath(tile.row, tile.col);
+        }
+        
+        this.updateTileDisplay();
+        e.preventDefault();
+    }
+
+    handleCanvasMouseMove(e) {
+        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        
+        const tile = this.getTileAt(e.offsetX, e.offsetY);
+        if (!tile) return;
+        
+        if (this.canAddToPath(tile.row, tile.col)) {
+            this.addToPath(tile.row, tile.col);
+            this.updateTileDisplay();
+        }
+        e.preventDefault();
+    }
+
+    handleCanvasMouseUp(e) {
+        if (this.isPaused || this.isFlipMode) return;
+        
+        this.isDragging = false;
+        this.dragStarted = false;
+        
+        this.finalizePath();
+        e.preventDefault();
+    }
+
+    // Touch event handlers
+    handleCanvasTouchStart(e) {
+        const touch = e.touches[0];
+        const rect = e.target.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        // Create a mock mouse event
+        const mockEvent = { offsetX: x, offsetY: y, preventDefault: () => e.preventDefault() };
+        this.handleCanvasMouseDown(mockEvent);
+    }
+
+    handleCanvasTouchMove(e) {
+        const touch = e.touches[0];
+        const rect = e.target.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        const mockEvent = { offsetX: x, offsetY: y, preventDefault: () => e.preventDefault() };
+        this.handleCanvasMouseMove(mockEvent);
+    }
+
+    handleCanvasTouchEnd(e) {
+        const mockEvent = { offsetX: 0, offsetY: 0, preventDefault: () => e.preventDefault() };
+        this.handleCanvasMouseUp(mockEvent);
     }
 
     startPath(row, col) {
