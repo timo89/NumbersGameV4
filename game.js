@@ -19,6 +19,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.isPaused = false;
         this.isFlipMode = false;
         this.gameStarted = false;
+        this.isDragging = false;
+        this.dragStarted = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -120,7 +122,8 @@ class NumbersGameScene extends Phaser.Scene {
                 bg.setStrokeStyle(1, 0x333333);
                 bg.setInteractive();
                 
-                // Create tile text
+                // Create tile text with proper contrast color
+                const textColor = this.getContrastTextColorString(value);
                 const text = this.add.text(
                     x + this.TILE_SIZE / 2, 
                     y + this.TILE_SIZE / 2, 
@@ -129,7 +132,7 @@ class NumbersGameScene extends Phaser.Scene {
                         fontSize: '24px',
                         fontFamily: 'Arial',
                         fontStyle: 'bold',
-                        color: '#ffffff',
+                        color: textColor,
                         align: 'center'
                     }
                 );
@@ -146,12 +149,103 @@ class NumbersGameScene extends Phaser.Scene {
         }
     }
 
-    getTileColor(value) {
+    /**
+     * Eye-friendly color palette for tile magnitudes 1-10
+     * Includes green, yellow, pink, and orange among the hues with accessible contrast
+     */
+    getPositiveColors() {
+        return [
+            0x10B981, // magnitude 1: green-500
+            0x22C55E, // magnitude 2: green-400  
+            0xFDE047, // magnitude 3: yellow-300
+            0xFCD34D, // magnitude 4: yellow-400
+            0xF59E0B, // magnitude 5: amber-500
+            0xF97316, // magnitude 6: orange-500
+            0xEF4444, // magnitude 7: red-500
+            0xEC4899, // magnitude 8: pink-500
+            0xA855F7, // magnitude 9: purple-500
+            0x3B82F6, // magnitude 10: blue-500
+        ];
+    }
+
+    /**
+     * Utility function to map numeric values to colors
+     * Positive values (1-10) use eye-friendly palette
+     * Negative values use white-complement rule: negativeColor = 0xFFFFFF - positiveColor
+     */
+    valueToColor(value) {
+        // Ensure value is in expected range
+        const absValue = Math.abs(value);
+        const magnitude = Math.min(Math.max(absValue, 1), 10);
+        
+        // Get base color for magnitude (1-indexed, so subtract 1 for array access)
+        const positiveColors = this.getPositiveColors();
+        const positiveColor = positiveColors[magnitude - 1];
+        
         if (value > 0) {
-            return 0x4CAF50; // Green for positive
+            return positiveColor;
         } else {
-            return 0xf44336; // Red for negative
+            // Negative color is complement to white: 0xFFFFFF - positiveColor
+            return 0xFFFFFF - positiveColor;
         }
+    }
+
+    /**
+     * Convert hex color to CSS string for React Native components
+     */
+    valueToColorString(value) {
+        const hexColor = this.valueToColor(value);
+        return `#${hexColor.toString(16).padStart(6, '0')}`;
+    }
+
+    /**
+     * Get text color that contrasts well with the background color
+     * Uses luminance calculation for better contrast determination
+     */
+    getContrastTextColor(value) {
+        const backgroundColor = this.valueToColor(value);
+        
+        // Extract RGB components
+        const r = (backgroundColor >> 16) & 0xFF;
+        const g = (backgroundColor >> 8) & 0xFF;
+        const b = backgroundColor & 0xFF;
+        
+        // Calculate relative luminance using WCAG formula
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        
+        // Use white text for dark backgrounds, dark text for light backgrounds
+        return luminance > 0.5 ? 0x374151 : 0xffffff;
+    }
+
+    /**
+     * Get text color string for React Native components
+     */
+    getContrastTextColorString(value) {
+        const color = this.getContrastTextColor(value);
+        return `#${color.toString(16).padStart(6, '0')}`;
+    }
+
+    /**
+     * Darken a color by reducing its RGB components by a percentage
+     * Preserves the original hue while making it darker
+     */
+    darkenColor(color, factor = 0.7) {
+        // Extract RGB components
+        const r = (color >> 16) & 0xFF;
+        const g = (color >> 8) & 0xFF;
+        const b = color & 0xFF;
+        
+        // Apply darkening factor (0.7 means 70% of original brightness)
+        const newR = Math.floor(r * factor);
+        const newG = Math.floor(g * factor);
+        const newB = Math.floor(b * factor);
+        
+        // Recombine into hex color
+        return (newR << 16) | (newG << 8) | newB;
+    }
+
+    getTileColor(value) {
+        return this.valueToColor(value);
     }
 
     getTileAt(x, y) {
@@ -172,16 +266,22 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
+        console.log('Pointer down:', pointer.x, pointer.y, 'isPaused:', this.isPaused);
         if (this.isPaused) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
+        console.log('Tile found:', tile);
         if (!tile) return;
         
-        this.input.setDragState(pointer, true);
+        // Set a custom dragging flag
+        this.isDragging = true;
+        this.dragStarted = true;
         
         if (this.isFlipMode) {
+            console.log('Flipping tile:', tile.row, tile.col);
             this.flipTile(tile.row, tile.col);
         } else {
+            console.log('Starting path:', tile.row, tile.col);
             this.startPath(tile.row, tile.col);
         }
         
@@ -189,21 +289,27 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerMove(pointer) {
-        if (this.isPaused || this.isFlipMode || !pointer.isDragging) return;
+        console.log('Pointer move:', pointer.x, pointer.y, 'isDragging:', this.isDragging);
+        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
+            console.log('Adding to path:', tile.row, tile.col);
             this.addToPath(tile.row, tile.col);
             this.updateTileDisplay();
         }
     }
 
     handlePointerUp(pointer) {
+        console.log('Pointer up:', pointer.x, pointer.y);
         if (this.isPaused || this.isFlipMode) return;
         
-        this.input.setDragState(pointer, false);
+        // Reset our custom dragging flag
+        this.isDragging = false;
+        this.dragStarted = false;
+        
         this.finalizePath();
     }
 
@@ -262,9 +368,13 @@ class NumbersGameScene extends Phaser.Scene {
                 if (isSelected) {
                     tile.bg.setFillStyle(0xFFE082); // Yellow for selected
                     tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border
+                    // Update text color for selected state
+                    tile.text.setColor('#374151'); // Dark text for light yellow background
                 } else {
                     tile.bg.setFillStyle(this.getTileColor(value));
                     tile.bg.setStrokeStyle(1, 0x333333);
+                    // Update text color for normal state
+                    tile.text.setColor(this.getContrastTextColorString(value));
                 }
             }
         }
@@ -386,8 +496,10 @@ class NumbersGameScene extends Phaser.Scene {
 
     flipTile(row, col) {
         this.grid[row][col] = -this.grid[row][col];
-        this.tileSprites[row][col].text.setText(this.grid[row][col].toString());
-        this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(this.grid[row][col]));
+        const newValue = this.grid[row][col];
+        this.tileSprites[row][col].text.setText(newValue.toString());
+        this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(newValue));
+        this.tileSprites[row][col].text.setColor(this.getContrastTextColorString(newValue));
     }
 
     togglePause() {
@@ -497,5 +609,5 @@ const config = {
 
 // Start the game when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new Phaser.Game(config);
+    window.game = new Phaser.Game(config);
 });
