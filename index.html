@@ -63,11 +63,16 @@
             color: white;
         }
         
-        #gameCanvas {
+        #gameContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #gameContainer canvas {
             background: white;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            cursor: pointer;
         }
         
         .feedback {
@@ -107,7 +112,7 @@
         <div>Length: <span id="length">0</span></div>
     </div>
     
-    <canvas id="gameCanvas" width="530" height="530"></canvas>
+    <div id="gameContainer"></div>
     
     <div class="controls">
         <button id="pauseBtn">⏸️ Pause</button>
@@ -115,6 +120,7 @@
         <button id="resetBtn">🔄 Reset</button>
     </div>
     
+    <script src="node_modules/phaser/dist/phaser.min.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
