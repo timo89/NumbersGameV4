@@ -21,6 +21,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.gameStarted = false;
         this.isDragging = false;
         this.dragStarted = false;
+        this.handledByPhaser = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -286,6 +287,9 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
+        // Prevent double handling by canvas events
+        this.handledByPhaser = true;
+        
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
         } else {
@@ -325,6 +329,12 @@ class NumbersGameScene extends Phaser.Scene {
     // Canvas mouse event handlers (alternative to Phaser pointer events)
     handleCanvasMouseDown(e) {
         if (this.isPaused) return;
+        
+        // Check if this event was already handled by Phaser
+        if (this.handledByPhaser) {
+            this.handledByPhaser = false;
+            return;
+        }
         
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
