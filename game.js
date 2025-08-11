@@ -661,7 +661,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     isValidPath() {
-        return this.currentSum % 5 === 0;
+        return this.selectedPath.length >= 2 && this.currentSum % 5 === 0;
     }
 
     processValidPath() {
