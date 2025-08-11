@@ -25,6 +25,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.handledByPhaser = false;
         this.lastFlipTime = 0;
         this.flipDebounceMs = 100;
+        this.isProcessingValidPath = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -607,10 +608,14 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     isValidPath() {
-        return this.currentSum !== 0 && this.currentSum % 5 === 0;
+        return this.currentSum % 5 === 0;
     }
 
     processValidPath() {
+        // Prevent multiple executions
+        if (this.isProcessingValidPath) return;
+        this.isProcessingValidPath = true;
+        
         // Clear the path line immediately after win
         this.pathGraphics.clear();
         
@@ -698,6 +703,9 @@ class NumbersGameScene extends Phaser.Scene {
             this.updateDisplay();
             this.clearPath();
             this.createTileSprites();
+            
+            // Reset the processing flag
+            this.isProcessingValidPath = false;
         });
     }
 
@@ -783,6 +791,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.isPaused = false;
         this.isFlipMode = false;
         this.gameStarted = false;
+        this.isProcessingValidPath = false;
         
         // Reset UI
         this.pauseBtn.textContent = '⏸️ Pause';
