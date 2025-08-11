@@ -9,7 +9,7 @@
             margin: 0;
             padding: 20px;
             background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -41,13 +41,17 @@
         }
         
         .path-info {
-            display: flex; /* Always allocate space */
-            gap: 20px;
+            background: white;
+            border-radius: 50px; /* Elliptical shape */
+            padding: 15px 30px;
             margin-bottom: 20px;
-            font-size: 16px;
-            color: #666;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
             visibility: hidden; /* Hidden by default, shown only during dragging */
             order: -1; /* After header, before game */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            white-space: nowrap;
         }
         
         .path-info.dragging {
@@ -108,9 +112,8 @@
         <div class="stat">High Score: <span id="highScore">0</span></div>
     </div>
     
-    <div class="path-info">
-        <div>Sum: <span id="sum">0</span></div>
-        <div>Length: <span id="length">0</span></div>
+    <div class="path-info" id="pathInfo">
+        Sum: <span id="sum">0</span> | Length: <span id="length">0</span>
     </div>
     
     <div id="gameContainer"></div>
