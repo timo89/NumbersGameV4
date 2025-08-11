@@ -38,6 +38,8 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Audio context for sound effects
         this.audioContext = null;
+        this.audioEnabled = true;
+        this.audioContextResumed = false;
     }
 
     /**
@@ -122,9 +124,18 @@ class NumbersGameScene extends Phaser.Scene {
     
     setupEventListeners() {
         // Control buttons
-        this.pauseBtn.addEventListener('click', () => this.togglePause());
-        this.flipBtn.addEventListener('click', () => this.toggleFlipMode());
-        this.resetBtn.addEventListener('click', () => this.resetGame());
+        this.pauseBtn.addEventListener('click', () => {
+            this.resumeAudioContext();
+            this.togglePause();
+        });
+        this.flipBtn.addEventListener('click', () => {
+            this.resumeAudioContext();
+            this.toggleFlipMode();
+        });
+        this.resetBtn.addEventListener('click', () => {
+            this.resumeAudioContext();
+            this.resetGame();
+        });
         
         // Phaser input events
         this.input.on('pointerdown', (pointer) => this.handlePointerDown(pointer));
@@ -390,6 +401,9 @@ class NumbersGameScene extends Phaser.Scene {
     handlePointerDown(pointer) {
         if (this.isPaused || this.isShowingMistakeEffect) return;
         
+        // Resume audio context on first user interaction
+        this.resumeAudioContext();
+        
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
@@ -442,6 +456,9 @@ class NumbersGameScene extends Phaser.Scene {
     // Canvas mouse event handlers (alternative to Phaser pointer events)
     handleCanvasMouseDown(e) {
         if (this.isPaused || this.isShowingMistakeEffect) return;
+        
+        // Resume audio context on first user interaction
+        this.resumeAudioContext();
         
         // Check if this event was already handled by Phaser
         if (this.handledByPhaser) {
@@ -1029,19 +1046,45 @@ class NumbersGameScene extends Phaser.Scene {
         try {
             // Initialize Web Audio API context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('Audio context initialized, state:', this.audioContext.state);
         } catch (error) {
             console.warn('Web Audio API not supported:', error);
             this.audioContext = null;
+            this.audioEnabled = false;
+        }
+    }
+
+    /**
+     * Resume audio context if it's suspended (required by browser audio policies)
+     */
+    async resumeAudioContext() {
+        if (!this.audioContext || this.audioContextResumed) return;
+        
+        try {
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+                console.log('Audio context resumed, state:', this.audioContext.state);
+            }
+            this.audioContextResumed = true;
+        } catch (error) {
+            console.warn('Failed to resume audio context:', error);
         }
     }
 
     playSuccessSound() {
-        if (!this.audioContext) return;
+        if (!this.audioContext || !this.audioEnabled) return;
         
         try {
+            // Ensure audio context is running
+            if (this.audioContext.state !== 'running') {
+                console.warn('Audio context not running, state:', this.audioContext.state);
+                return;
+            }
+            
             // Create a pleasant ascending chord for success
             const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
-            const duration = 0.3;
+            const duration = 0.4;
+            const volume = 0.3; // Increased volume
             
             frequencies.forEach((freq, index) => {
                 const oscillator = this.audioContext.createOscillator();
@@ -1055,21 +1098,30 @@ class NumbersGameScene extends Phaser.Scene {
                 
                 // Fade in and out for smooth sound
                 gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.02);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
                 
-                oscillator.start(this.audioContext.currentTime + index * 0.05);
-                oscillator.stop(this.audioContext.currentTime + duration + index * 0.05);
+                const startTime = this.audioContext.currentTime + index * 0.05;
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
             });
+            
+            console.log('Success sound played');
         } catch (error) {
             console.warn('Error playing success sound:', error);
         }
     }
 
     playFailureSound() {
-        if (!this.audioContext) return;
+        if (!this.audioContext || !this.audioEnabled) return;
         
         try {
+            // Ensure audio context is running
+            if (this.audioContext.state !== 'running') {
+                console.warn('Audio context not running, state:', this.audioContext.state);
+                return;
+            }
+            
             // Create a short descending buzz for failure
             const oscillator = this.audioContext.createOscillator();
             const gainNode = this.audioContext.createGain();
@@ -1082,13 +1134,16 @@ class NumbersGameScene extends Phaser.Scene {
             oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.3);
             oscillator.type = 'sawtooth';
             
-            // Quick fade in and out
+            // Quick fade in and out with higher volume
+            const volume = 0.25; // Increased volume
             gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.01);
+            gainNode.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.02);
             gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
             
             oscillator.start(this.audioContext.currentTime);
             oscillator.stop(this.audioContext.currentTime + 0.3);
+            
+            console.log('Failure sound played');
         } catch (error) {
             console.warn('Error playing failure sound:', error);
         }
