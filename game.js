@@ -653,8 +653,8 @@ class NumbersGameScene extends Phaser.Scene {
             }
         }
         
-        // Generate 2-3 random tiles only
-        const tilesToGenerate = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
+        // Generate exactly 2-3 tiles total, never more
+        const tilesToGenerate = Math.floor(Math.random() * 2) + 2; // Always 2 or 3
         const tilesToPlace = Math.min(tilesToGenerate, emptyPositions.length);
         
         // Shuffle empty positions and select random ones for new tiles
