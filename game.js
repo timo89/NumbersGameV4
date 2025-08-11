@@ -107,6 +107,10 @@ class NumbersGameScene extends Phaser.Scene {
         this.gridGraphics = this.add.graphics();
         this.gridGraphics.setDepth(-1); // Ensure grid lines are behind tiles
         
+        // Initialize graphics object for mistake effects
+        this.mistakeGraphics = this.add.graphics();
+        this.mistakeGraphics.setDepth(1500); // Above everything, including path lines
+        
         // Initialize game
         this.generateGrid();
         this.drawGrid();
@@ -705,12 +709,140 @@ class NumbersGameScene extends Phaser.Scene {
         // Play failure sound
         this.playFailureSound();
         
+        // Show red zig-zag mistake effect
+        this.showMistakeEffect();
+        
         // Shake the board on failure
         this.cameras.main.shake(300, 0.01);
         
         // Clear the path
         this.clearPath();
         this.updateTileDisplay();
+    }
+
+    /**
+     * Draw red zig-zag lines across the board to indicate a mistake
+     */
+    drawMistakeEffect() {
+        if (!this.mistakeGraphics) return;
+        
+        this.mistakeGraphics.clear();
+        
+        // Calculate board boundaries
+        const boardLeft = this.CANVAS_PADDING;
+        const boardTop = this.CANVAS_PADDING;
+        const boardRight = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
+        const boardBottom = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
+        
+        // Set up red color with transparency
+        this.mistakeGraphics.lineStyle(4, 0xFF0000, 0.8); // Red, semi-transparent
+        
+        // Draw diagonal zig-zag lines from top-left to bottom-right
+        const zigzagSpacing = 40; // Distance between zig-zag lines
+        const zigzagAmplitude = 20; // Height of zig-zag peaks
+        const zigzagFrequency = 30; // Distance between peaks
+        
+        // Draw multiple diagonal zig-zag lines
+        for (let offset = -boardRight; offset < boardRight + boardBottom; offset += zigzagSpacing) {
+            this.mistakeGraphics.beginPath();
+            
+            let startX = boardLeft + offset;
+            let startY = boardTop;
+            
+            // Adjust start position if line starts outside board
+            if (startX < boardLeft) {
+                const yOffset = (boardLeft - startX);
+                startX = boardLeft;
+                startY = boardTop + yOffset;
+            }
+            
+            // Draw zig-zag line
+            let currentX = startX;
+            let currentY = startY;
+            let zigzagUp = true;
+            
+            this.mistakeGraphics.moveTo(currentX, currentY);
+            
+            while (currentX < boardRight && currentY < boardBottom) {
+                const nextX = Math.min(currentX + zigzagFrequency, boardRight);
+                const nextY = Math.min(currentY + zigzagFrequency, boardBottom);
+                
+                // Add zig-zag pattern
+                const midX = currentX + (nextX - currentX) / 2;
+                const midY = currentY + (nextY - currentY) / 2;
+                const zigzagOffset = zigzagUp ? -zigzagAmplitude : zigzagAmplitude;
+                
+                // Calculate perpendicular offset for zig-zag
+                const angle = Math.atan2(nextY - currentY, nextX - currentX);
+                const perpAngle = angle + Math.PI / 2;
+                const zigzagX = midX + Math.cos(perpAngle) * zigzagOffset;
+                const zigzagY = midY + Math.sin(perpAngle) * zigzagOffset;
+                
+                this.mistakeGraphics.lineTo(zigzagX, zigzagY);
+                this.mistakeGraphics.lineTo(nextX, nextY);
+                
+                currentX = nextX;
+                currentY = nextY;
+                zigzagUp = !zigzagUp;
+            }
+            
+            this.mistakeGraphics.strokePath();
+        }
+        
+        // Draw additional visual effects - red X pattern in corners
+        this.mistakeGraphics.lineStyle(6, 0xFF4444, 0.6);
+        
+        // Top-left to bottom-right X
+        this.mistakeGraphics.beginPath();
+        this.mistakeGraphics.moveTo(boardLeft + 10, boardTop + 10);
+        this.mistakeGraphics.lineTo(boardRight - 10, boardBottom - 10);
+        this.mistakeGraphics.strokePath();
+        
+        // Top-right to bottom-left X
+        this.mistakeGraphics.beginPath();
+        this.mistakeGraphics.moveTo(boardRight - 10, boardTop + 10);
+        this.mistakeGraphics.lineTo(boardLeft + 10, boardBottom - 10);
+        this.mistakeGraphics.strokePath();
+        
+        // Add red border around the entire board
+        this.mistakeGraphics.lineStyle(3, 0xFF0000, 0.7);
+        this.mistakeGraphics.strokeRect(boardLeft, boardTop, boardRight - boardLeft, boardBottom - boardTop);
+    }
+
+    /**
+     * Show mistake effect with animation
+     */
+    showMistakeEffect() {
+        // Draw the mistake effect
+        this.drawMistakeEffect();
+        
+        // Start with invisible and scale up
+        this.mistakeGraphics.setAlpha(0);
+        this.mistakeGraphics.setScale(0.8);
+        
+        // Animate in
+        this.tweens.add({
+            targets: this.mistakeGraphics,
+            alpha: 1,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                // Hold for a moment, then fade out
+                this.time.delayedCall(1000, () => {
+                    this.tweens.add({
+                        targets: this.mistakeGraphics,
+                        alpha: 0,
+                        duration: 500,
+                        ease: 'Power2.easeOut',
+                        onComplete: () => {
+                            this.mistakeGraphics.clear();
+                        }
+                    });
+                });
+            }
+        });
     }
 
 
