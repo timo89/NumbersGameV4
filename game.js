@@ -4,9 +4,10 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Game constants
         this.GRID_SIZE = 6;
-        this.TILE_SIZE = 80;
-        this.TILE_SPACING = 5;
-        this.CANVAS_PADDING = 15;
+        this.CELL_SIZE = 80;           // Size of each grid cell
+        this.TILE_SIZE = 70;           // Size of the tile within the cell
+        this.TILE_SPACING = 5;         // Deprecated - using cell-based positioning now
+        this.CANVAS_PADDING = 25;
         
         // Game state
         this.grid = [];
@@ -19,6 +20,12 @@ class NumbersGameScene extends Phaser.Scene {
         this.isPaused = false;
         this.isFlipMode = false;
         this.gameStarted = false;
+        this.isDragging = false;
+        this.dragStarted = false;
+        this.handledByPhaser = false;
+        this.lastFlipTime = 0;
+        this.flipDebounceMs = 100;
+        this.isProcessingValidPath = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -26,6 +33,9 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Timer
         this.gameTimer = null;
+        
+        // Audio context for sound effects
+        this.audioContext = null;
     }
 
     preload() {
@@ -33,6 +43,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     create() {
+        // Initialize audio context for sound effects
+        this.initializeAudio();
+        
         // Initialize UI elements
         this.scoreEl = document.getElementById('score');
         this.levelEl = document.getElementById('level');
@@ -40,6 +53,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.highScoreEl = document.getElementById('highScore');
         this.sumEl = document.getElementById('sum');
         this.lengthEl = document.getElementById('length');
+        this.pathInfoEl = document.querySelector('.path-info');
         
         // Controls
         this.pauseBtn = document.getElementById('pauseBtn');
@@ -51,9 +65,15 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Initialize graphics object for path lines
         this.pathGraphics = this.add.graphics();
+        this.pathGraphics.setDepth(1000); // Ensure path lines are above tiles
+        
+        // Initialize graphics object for grid lines
+        this.gridGraphics = this.add.graphics();
+        this.gridGraphics.setDepth(-1); // Ensure grid lines are behind tiles
         
         // Initialize game
         this.generateGrid();
+        this.drawGrid();
         this.createTileSprites();
         this.updateDisplay();
         this.startGame();
@@ -69,6 +89,19 @@ class NumbersGameScene extends Phaser.Scene {
         this.input.on('pointerdown', (pointer) => this.handlePointerDown(pointer));
         this.input.on('pointermove', (pointer) => this.handlePointerMove(pointer));
         this.input.on('pointerup', (pointer) => this.handlePointerUp(pointer));
+        
+        // Alternative: Add direct mouse/touch events to the canvas
+        const canvas = this.sys.game.canvas;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+        canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e));
+        canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+        
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', (e) => this.handleCanvasTouchStart(e));
+        canvas.addEventListener('touchmove', (e) => this.handleCanvasTouchMove(e));
+        canvas.addEventListener('touchend', (e) => this.handleCanvasTouchEnd(e));
     }
 
     generateGrid() {
@@ -89,13 +122,42 @@ class NumbersGameScene extends Phaser.Scene {
         return value;
     }
 
+    drawGrid() {
+        if (!this.gridGraphics) return;
+        
+        this.gridGraphics.clear();
+        this.gridGraphics.lineStyle(2, 0x000000, 1); // Black grid lines, 2px thick
+        
+        // Calculate grid dimensions
+        const gridWidth = this.GRID_SIZE * this.CELL_SIZE;
+        const gridHeight = this.GRID_SIZE * this.CELL_SIZE;
+        const startX = this.CANVAS_PADDING;
+        const startY = this.CANVAS_PADDING;
+        
+        // Draw vertical lines
+        for (let i = 0; i <= this.GRID_SIZE; i++) {
+            const x = startX + i * this.CELL_SIZE;
+            this.gridGraphics.moveTo(x, startY);
+            this.gridGraphics.lineTo(x, startY + gridHeight);
+        }
+        
+        // Draw horizontal lines
+        for (let i = 0; i <= this.GRID_SIZE; i++) {
+            const y = startY + i * this.CELL_SIZE;
+            this.gridGraphics.moveTo(startX, y);
+            this.gridGraphics.lineTo(startX + gridWidth, y);
+        }
+        
+        this.gridGraphics.strokePath();
+    }
+
     createTileSprites() {
         // Clear existing sprites
         if (this.tileSprites.length > 0) {
             this.tileSprites.forEach(row => {
                 row.forEach(tile => {
-                    if (tile.bg) tile.bg.destroy();
-                    if (tile.text) tile.text.destroy();
+                    if (tile && tile.bg) tile.bg.destroy();
+                    if (tile && tile.text) tile.text.destroy();
                 });
             });
         }
@@ -105,14 +167,27 @@ class NumbersGameScene extends Phaser.Scene {
         for (let row = 0; row < this.GRID_SIZE; row++) {
             this.tileSprites[row] = [];
             for (let col = 0; col < this.GRID_SIZE; col++) {
-                const x = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
-                const y = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
+                // Calculate cell position
+                const cellX = this.CANVAS_PADDING + col * this.CELL_SIZE;
+                const cellY = this.CANVAS_PADDING + row * this.CELL_SIZE;
+                
+                // Center tile within cell with padding
+                const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+                const tileX = cellX + tilePadding;
+                const tileY = cellY + tilePadding;
+                
                 const value = this.grid[row][col];
+                
+                // If tile is empty (null), create invisible placeholder
+                if (value === null) {
+                    this.tileSprites[row][col] = null;
+                    continue;
+                }
                 
                 // Create tile background rectangle
                 const bg = this.add.rectangle(
-                    x + this.TILE_SIZE / 2, 
-                    y + this.TILE_SIZE / 2, 
+                    tileX + this.TILE_SIZE / 2, 
+                    tileY + this.TILE_SIZE / 2, 
                     this.TILE_SIZE, 
                     this.TILE_SIZE, 
                     this.getTileColor(value)
@@ -120,16 +195,17 @@ class NumbersGameScene extends Phaser.Scene {
                 bg.setStrokeStyle(1, 0x333333);
                 bg.setInteractive();
                 
-                // Create tile text
+                // Create tile text with proper contrast color
+                const textColor = this.getContrastTextColorString(value);
                 const text = this.add.text(
-                    x + this.TILE_SIZE / 2, 
-                    y + this.TILE_SIZE / 2, 
+                    tileX + this.TILE_SIZE / 2, 
+                    tileY + this.TILE_SIZE / 2, 
                     value.toString(), 
                     {
                         fontSize: '24px',
-                        fontFamily: 'Arial',
+                        fontFamily: 'Comic Sans MS',
                         fontStyle: 'bold',
-                        color: '#ffffff',
+                        color: textColor,
                         align: 'center'
                     }
                 );
@@ -146,23 +222,121 @@ class NumbersGameScene extends Phaser.Scene {
         }
     }
 
-    getTileColor(value) {
+    /**
+     * Eye-friendly color palette for tile magnitudes 1-10
+     * Includes green, yellow, pink, and orange among the hues with accessible contrast
+     */
+    getPositiveColors() {
+        return [
+            0x10B981, // magnitude 1: green-500
+            0x22C55E, // magnitude 2: green-400  
+            0xFDE047, // magnitude 3: yellow-300
+            0xFCD34D, // magnitude 4: yellow-400
+            0xF59E0B, // magnitude 5: amber-500
+            0xF97316, // magnitude 6: orange-500
+            0xEF4444, // magnitude 7: red-500
+            0xEC4899, // magnitude 8: pink-500
+            0xA855F7, // magnitude 9: purple-500
+            0x3B82F6, // magnitude 10: blue-500
+        ];
+    }
+
+    /**
+     * Utility function to map numeric values to colors
+     * Positive values (1-10) use eye-friendly palette
+     * Negative values use white-complement rule: negativeColor = 0xFFFFFF - positiveColor
+     */
+    valueToColor(value) {
+        // Ensure value is in expected range
+        const absValue = Math.abs(value);
+        const magnitude = Math.min(Math.max(absValue, 1), 10);
+        
+        // Get base color for magnitude (1-indexed, so subtract 1 for array access)
+        const positiveColors = this.getPositiveColors();
+        const positiveColor = positiveColors[magnitude - 1];
+        
         if (value > 0) {
-            return 0x4CAF50; // Green for positive
+            return positiveColor;
         } else {
-            return 0xf44336; // Red for negative
+            // Negative color is complement to white: 0xFFFFFF - positiveColor
+            return 0xFFFFFF - positiveColor;
         }
     }
 
+    /**
+     * Convert hex color to CSS string for React Native components
+     */
+    valueToColorString(value) {
+        const hexColor = this.valueToColor(value);
+        return `#${hexColor.toString(16).padStart(6, '0')}`;
+    }
+
+    /**
+     * Get text color that contrasts well with the background color
+     * Uses luminance calculation for better contrast determination
+     */
+    getContrastTextColor(value) {
+        const backgroundColor = this.valueToColor(value);
+        
+        // Extract RGB components
+        const r = (backgroundColor >> 16) & 0xFF;
+        const g = (backgroundColor >> 8) & 0xFF;
+        const b = backgroundColor & 0xFF;
+        
+        // Calculate relative luminance using WCAG formula
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        
+        // Use white text for dark backgrounds, dark text for light backgrounds
+        return luminance > 0.5 ? 0x374151 : 0xffffff;
+    }
+
+    /**
+     * Get text color string for React Native components
+     */
+    getContrastTextColorString(value) {
+        const color = this.getContrastTextColor(value);
+        return `#${color.toString(16).padStart(6, '0')}`;
+    }
+
+    /**
+     * Darken a color by reducing its RGB components by a percentage
+     * Preserves the original hue while making it darker
+     */
+    darkenColor(color, factor = 0.7) {
+        // Extract RGB components
+        const r = (color >> 16) & 0xFF;
+        const g = (color >> 8) & 0xFF;
+        const b = color & 0xFF;
+        
+        // Apply darkening factor (0.7 means 70% of original brightness)
+        const newR = Math.floor(r * factor);
+        const newG = Math.floor(g * factor);
+        const newB = Math.floor(b * factor);
+        
+        // Recombine into hex color
+        return (newR << 16) | (newG << 8) | newB;
+    }
+
+    getTileColor(value) {
+        return this.valueToColor(value);
+    }
+
     getTileAt(x, y) {
-        const col = Math.floor((x - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
-        const row = Math.floor((y - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
+        // Calculate which cell the click is in
+        const col = Math.floor((x - this.CANVAS_PADDING) / this.CELL_SIZE);
+        const row = Math.floor((y - this.CANVAS_PADDING) / this.CELL_SIZE);
         
         if (row >= 0 && row < this.GRID_SIZE && col >= 0 && col < this.GRID_SIZE) {
-            // Check if click is within tile bounds
-            const tileX = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
-            const tileY = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
+            // Calculate cell position
+            const cellX = this.CANVAS_PADDING + col * this.CELL_SIZE;
+            const cellY = this.CANVAS_PADDING + row * this.CELL_SIZE;
             
+            // Calculate tile position within cell
+            const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+            const tileX = cellX + tilePadding;
+            const tileY = cellY + tilePadding;
+            
+            // Check if click is within tile bounds (not just cell bounds)
             if (x >= tileX && x <= tileX + this.TILE_SIZE &&
                 y >= tileY && y <= tileY + this.TILE_SIZE) {
                 return { row, col };
@@ -177,11 +351,19 @@ class NumbersGameScene extends Phaser.Scene {
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
         
-        this.input.setDragState(pointer, true);
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
+        
+        // Set flag to prevent canvas events from processing the same interaction
+        this.handledByPhaser = true;
+        setTimeout(() => { this.handledByPhaser = false; }, 50);
         
         if (this.isFlipMode) {
             this.flipTile(tile.row, tile.col);
         } else {
+            // Set a custom dragging flag only for path selection
+            this.isDragging = true;
+            this.dragStarted = true;
             this.startPath(tile.row, tile.col);
         }
         
@@ -189,10 +371,13 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerMove(pointer) {
-        if (this.isPaused || this.isFlipMode || !pointer.isDragging) return;
+        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
+        
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
         
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
@@ -201,15 +386,106 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerUp(pointer) {
-        if (this.isPaused || this.isFlipMode) return;
+        if (this.isPaused) return;
         
-        this.input.setDragState(pointer, false);
-        this.finalizePath();
+        if (!this.isFlipMode) {
+            // Reset our custom dragging flag
+            this.isDragging = false;
+            this.dragStarted = false;
+            
+            this.finalizePath();
+        }
+    }
+
+    // Canvas mouse event handlers (alternative to Phaser pointer events)
+    handleCanvasMouseDown(e) {
+        if (this.isPaused) return;
+        
+        // Check if this event was already handled by Phaser
+        if (this.handledByPhaser) {
+            return;
+        }
+        
+        const tile = this.getTileAt(e.offsetX, e.offsetY);
+        if (!tile) return;
+        
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
+        
+        if (this.isFlipMode) {
+            this.flipTile(tile.row, tile.col);
+        } else {
+            this.isDragging = true;
+            this.dragStarted = true;
+            this.startPath(tile.row, tile.col);
+        }
+        
+        this.updateTileDisplay();
+        e.preventDefault();
+    }
+
+    handleCanvasMouseMove(e) {
+        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        
+        const tile = this.getTileAt(e.offsetX, e.offsetY);
+        if (!tile) return;
+        
+        // Check if tile has a value (not empty)
+        if (this.grid[tile.row][tile.col] === null) return;
+        
+        if (this.canAddToPath(tile.row, tile.col)) {
+            this.addToPath(tile.row, tile.col);
+            this.updateTileDisplay();
+        }
+        e.preventDefault();
+    }
+
+    handleCanvasMouseUp(e) {
+        if (this.isPaused) return;
+        
+        if (!this.isFlipMode) {
+            this.isDragging = false;
+            this.dragStarted = false;
+            
+            this.finalizePath();
+        }
+        e.preventDefault();
+    }
+
+    // Touch event handlers
+    handleCanvasTouchStart(e) {
+        const touch = e.touches[0];
+        const rect = e.target.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        // Create a mock mouse event
+        const mockEvent = { offsetX: x, offsetY: y, preventDefault: () => e.preventDefault() };
+        this.handleCanvasMouseDown(mockEvent);
+    }
+
+    handleCanvasTouchMove(e) {
+        const touch = e.touches[0];
+        const rect = e.target.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        const mockEvent = { offsetX: x, offsetY: y, preventDefault: () => e.preventDefault() };
+        this.handleCanvasMouseMove(mockEvent);
+    }
+
+    handleCanvasTouchEnd(e) {
+        if (!this.isFlipMode) {
+            const mockEvent = { offsetX: 0, offsetY: 0, preventDefault: () => e.preventDefault() };
+            this.handleCanvasMouseUp(mockEvent);
+        }
     }
 
     startPath(row, col) {
         this.clearPath();
         this.addToPath(row, col);
+        // Show path info when dragging starts
+        this.pathInfoEl.classList.add('dragging');
     }
 
     canAddToPath(row, col) {
@@ -249,6 +525,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.selectedPath = [];
         this.currentSum = 0;
         this.updatePathDisplay();
+        // Hide path info when clearing path
+        this.pathInfoEl.classList.remove('dragging');
     }
 
     updateTileDisplay() {
@@ -259,12 +537,34 @@ class NumbersGameScene extends Phaser.Scene {
                 const isSelected = this.isSelected(row, col);
                 const value = this.grid[row][col];
                 
-                if (isSelected) {
-                    tile.bg.setFillStyle(0xFFE082); // Yellow for selected
-                    tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border
-                } else {
-                    tile.bg.setFillStyle(this.getTileColor(value));
+                // Skip if tile is empty (null)
+                if (tile === null || value === null) {
+                    continue;
+                }
+                
+                // If game is paused, gray out all tiles and hide numbers
+                if (this.isPaused) {
+                    tile.bg.setFillStyle(0x808080); // Gray background
                     tile.bg.setStrokeStyle(1, 0x333333);
+                    tile.text.setVisible(false); // Hide the numbers
+                } else {
+                    // Show the numbers when not paused
+                    tile.text.setVisible(true);
+                    
+                    if (isSelected && this.isDragging) {
+                        // Dim the tile by using a darker version of its original color
+                        const originalColor = this.getTileColor(value);
+                        const dimmedColor = this.darkenColor(originalColor, 0.7);
+                        tile.bg.setFillStyle(dimmedColor);
+                        tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border for selection
+                        // Adjust text color for dimmed background
+                        tile.text.setColor(this.getContrastTextColorString(value));
+                    } else {
+                        tile.bg.setFillStyle(this.getTileColor(value));
+                        tile.bg.setStrokeStyle(1, 0x333333);
+                        // Update text color for normal state
+                        tile.text.setColor(this.getContrastTextColorString(value));
+                    }
                 }
             }
         }
@@ -281,8 +581,18 @@ class NumbersGameScene extends Phaser.Scene {
             
             for (let i = 0; i < this.selectedPath.length; i++) {
                 const tile = this.selectedPath[i];
-                const x = this.CANVAS_PADDING + tile.col * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
-                const y = this.CANVAS_PADDING + tile.row * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
+                
+                // Calculate cell position
+                const cellX = this.CANVAS_PADDING + tile.col * this.CELL_SIZE;
+                const cellY = this.CANVAS_PADDING + tile.row * this.CELL_SIZE;
+                
+                // Center of tile within cell
+                const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+                const tileX = cellX + tilePadding;
+                const tileY = cellY + tilePadding;
+                
+                const x = tileX + this.TILE_SIZE / 2;
+                const y = tileY + this.TILE_SIZE / 2;
                 
                 if (i === 0) {
                     this.pathGraphics.beginPath();
@@ -303,6 +613,9 @@ class NumbersGameScene extends Phaser.Scene {
     finalizePath() {
         if (this.selectedPath.length === 0) return;
         
+        // Hide path info when dragging ends
+        this.pathInfoEl.classList.remove('dragging');
+        
         if (this.isValidPath()) {
             this.processValidPath();
         } else {
@@ -311,10 +624,20 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     isValidPath() {
-        return this.currentSum !== 0 && this.currentSum % 5 === 0;
+        return this.currentSum % 5 === 0;
     }
 
     processValidPath() {
+        // Prevent multiple executions
+        if (this.isProcessingValidPath) return;
+        this.isProcessingValidPath = true;
+        
+        // Play success sound
+        this.playSuccessSound();
+        
+        // Clear the path line immediately after win
+        this.pathGraphics.clear();
+        
         // Calculate score (absolute value of sum)
         const pathScore = Math.abs(this.currentSum);
         this.score += pathScore;
@@ -325,85 +648,146 @@ class NumbersGameScene extends Phaser.Scene {
             localStorage.setItem('numbersGameHighScore', this.highScore.toString());
         }
         
-        // Show success feedback
-        this.showFeedback('Success!', 'success');
+
         
-        // Clear selected tiles and generate new ones
-        this.clearSelectedTiles();
-        
-        // Add 2-3 new random tiles
-        this.addRandomTiles();
-        
-        // Update displays
-        this.updateDisplay();
-        this.clearPath();
-        this.createTileSprites();
+        // Animate tiles out then clear and regenerate
+        this.animateSelectedTilesOut();
     }
 
     processInvalidPath() {
-        // Show failure feedback
-        this.showFeedback('Invalid path!', 'failure');
+        // Play failure sound
+        this.playFailureSound();
+        
+        // Shake the board on failure
+        this.cameras.main.shake(300, 0.01);
         
         // Clear the path
         this.clearPath();
         this.updateTileDisplay();
     }
 
-    showFeedback(message, type) {
-        const feedback = document.createElement('div');
-        feedback.className = `feedback ${type}`;
-        feedback.textContent = message;
-        document.body.appendChild(feedback);
-        
-        setTimeout(() => {
-            if (document.body.contains(feedback)) {
-                document.body.removeChild(feedback);
-            }
-        }, 1000);
-    }
 
-    clearSelectedTiles() {
+
+    animateSelectedTilesOut() {
+        const tilesToAnimate = [];
+        
+        // Collect tiles to animate
         this.selectedPath.forEach(tile => {
-            this.grid[tile.row][tile.col] = this.generateTileValue();
+            const tileSprite = this.tileSprites[tile.row][tile.col];
+            tilesToAnimate.push(tileSprite);
+        });
+        
+        // Create animation promises for all tiles
+        const animationPromises = tilesToAnimate.map(tileSprite => {
+            return new Promise((resolve) => {
+                // Animate both background and text simultaneously
+                this.tweens.add({
+                    targets: [tileSprite.bg, tileSprite.text],
+                    alpha: 0,
+                    scaleX: 0.3,
+                    scaleY: 0.3,
+                    duration: 400,
+                    ease: 'Back.easeIn',
+                    onComplete: resolve
+                });
+            });
+        });
+        
+        // Add a timeout fallback to prevent getting stuck
+        const timeoutPromise = new Promise((resolve) => {
+            setTimeout(resolve, 600); // Give 200ms extra after animation duration
+        });
+        
+        // Use Promise.race to ensure we don't get stuck waiting for animations
+        Promise.race([
+            Promise.all(animationPromises),
+            timeoutPromise
+        ]).then(() => {
+            // Clear selected tiles and generate new ones
+            this.clearSelectedTiles();
+            
+            // Add 2-3 new random tiles on empty spaces
+            this.addRandomTilesOnEmptySpaces();
+            
+            // Update displays
+            this.updateDisplay();
+            this.clearPath();
+            this.createTileSprites();
+            
+            // Reset the processing flag
+            this.isProcessingValidPath = false;
         });
     }
 
-    addRandomTiles() {
-        const tilesToReplace = Math.floor(Math.random() * 2) + 2; // 2-3 tiles
-        
-        for (let i = 0; i < tilesToReplace; i++) {
-            const row = Math.floor(Math.random() * this.GRID_SIZE);
-            const col = Math.floor(Math.random() * this.GRID_SIZE);
-            
-            // Skip if this tile was just cleared
-            if (this.selectedPath.some(tile => tile.row === row && tile.col === col)) {
-                continue;
+    addRandomTilesOnEmptySpaces() {
+        // Get all empty positions (including recently cleared tiles)
+        const emptyPositions = [];
+        for (let row = 0; row < this.GRID_SIZE; row++) {
+            for (let col = 0; col < this.GRID_SIZE; col++) {
+                if (this.grid[row][col] === null) {
+                    emptyPositions.push({ row, col });
+                }
             }
-            
-            this.grid[row][col] = this.generateTileValue();
+        }
+        
+        // Generate exactly 2-3 tiles total, never more
+        const tilesToGenerate = Math.floor(Math.random() * 2) + 2; // Always 2 or 3
+        const tilesToPlace = Math.min(tilesToGenerate, emptyPositions.length);
+        
+        // Shuffle empty positions and select random ones for new tiles
+        for (let i = 0; i < tilesToPlace; i++) {
+            const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+            const position = emptyPositions.splice(randomIndex, 1)[0];
+            this.grid[position.row][position.col] = this.generateTileValue();
         }
     }
 
+    clearSelectedTiles() {
+        // Clear selected tiles (set to null so they become empty spaces)
+        this.selectedPath.forEach(tile => {
+            this.grid[tile.row][tile.col] = null;
+        });
+    }
+
     flipTile(row, col) {
+        const currentTime = Date.now();
+        
+        // Debounce rapid flip attempts to prevent double-clicking
+        if (currentTime - this.lastFlipTime < this.flipDebounceMs) {
+            return;
+        }
+        
+        // Don't flip empty tiles
+        if (this.grid[row][col] === null) {
+            return;
+        }
+        
+        this.lastFlipTime = currentTime;
+        
         this.grid[row][col] = -this.grid[row][col];
-        this.tileSprites[row][col].text.setText(this.grid[row][col].toString());
-        this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(this.grid[row][col]));
+        const newValue = this.grid[row][col];
+        this.tileSprites[row][col].text.setText(newValue.toString());
+        this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(newValue));
+        this.tileSprites[row][col].text.setColor(this.getContrastTextColorString(newValue));
     }
 
     togglePause() {
         this.isPaused = !this.isPaused;
-        this.pauseBtn.textContent = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
+        this.pauseBtn.textContent = this.isPaused ? '▶️' : '⏸️';
         
         if (this.isPaused) {
             this.scene.pause();
         } else {
             this.scene.resume();
         }
+        
+        // Update tile display to show/hide numbers based on pause state
+        this.updateTileDisplay();
     }
 
     toggleFlipMode() {
         this.isFlipMode = !this.isFlipMode;
-        this.flipBtn.textContent = this.isFlipMode ? '🎯 Select Mode' : '🔄 Flip Mode';
+        this.flipBtn.textContent = this.isFlipMode ? '🎯' : '🔄';
         this.flipBtn.classList.toggle('active', this.isFlipMode);
         
         if (this.isFlipMode) {
@@ -420,10 +804,11 @@ class NumbersGameScene extends Phaser.Scene {
         this.isPaused = false;
         this.isFlipMode = false;
         this.gameStarted = false;
+        this.isProcessingValidPath = false;
         
         // Reset UI
-        this.pauseBtn.textContent = '⏸️ Pause';
-        this.flipBtn.textContent = '🔄 Flip Mode';
+        this.pauseBtn.textContent = '⏸️';
+        this.flipBtn.textContent = '🔄';
         this.flipBtn.classList.remove('active');
         
         // Stop timer
@@ -434,10 +819,80 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Regenerate grid
         this.generateGrid();
+        this.drawGrid();
         this.createTileSprites();
         this.updateDisplay();
         
         this.startGame();
+    }
+
+    initializeAudio() {
+        try {
+            // Initialize Web Audio API context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (error) {
+            console.warn('Web Audio API not supported:', error);
+            this.audioContext = null;
+        }
+    }
+
+    playSuccessSound() {
+        if (!this.audioContext) return;
+        
+        try {
+            // Create a pleasant ascending chord for success
+            const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
+            const duration = 0.3;
+            
+            frequencies.forEach((freq, index) => {
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+                oscillator.type = 'sine';
+                
+                // Fade in and out for smooth sound
+                gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime + index * 0.05);
+                oscillator.stop(this.audioContext.currentTime + duration + index * 0.05);
+            });
+        } catch (error) {
+            console.warn('Error playing success sound:', error);
+        }
+    }
+
+    playFailureSound() {
+        if (!this.audioContext) return;
+        
+        try {
+            // Create a short descending buzz for failure
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Start at 200Hz and drop to 100Hz
+            oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.3);
+            oscillator.type = 'sawtooth';
+            
+            // Quick fade in and out
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.3);
+        } catch (error) {
+            console.warn('Error playing failure sound:', error);
+        }
     }
 
     updateDisplay() {
@@ -497,5 +952,5 @@ const config = {
 
 // Start the game when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new Phaser.Game(config);
+    window.game = new Phaser.Game(config);
 });
