@@ -27,6 +27,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.lastFlipTime = 0;
         this.flipDebounceMs = 100;
         this.isProcessingValidPath = false;
+        this.isShowingMistakeEffect = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -387,7 +388,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
@@ -412,7 +413,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerMove(pointer) {
-        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        if (this.isPaused || this.isFlipMode || !this.isDragging || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
@@ -427,7 +428,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerUp(pointer) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         if (!this.isFlipMode) {
             // Reset our custom dragging flag
@@ -440,7 +441,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     // Canvas mouse event handlers (alternative to Phaser pointer events)
     handleCanvasMouseDown(e) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         // Check if this event was already handled by Phaser
         if (this.handledByPhaser) {
@@ -466,7 +467,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasMouseMove(e) {
-        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        if (this.isPaused || this.isFlipMode || !this.isDragging || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
@@ -482,7 +483,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasMouseUp(e) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         if (!this.isFlipMode) {
             this.isDragging = false;
@@ -824,6 +825,9 @@ class NumbersGameScene extends Phaser.Scene {
      * Show mistake effect with animation
      */
     showMistakeEffect() {
+        // Set flag to block user interactions during mistake effect
+        this.isShowingMistakeEffect = true;
+        
         // Draw the mistake effect
         this.drawMistakeEffect();
         
@@ -849,6 +853,8 @@ class NumbersGameScene extends Phaser.Scene {
                         ease: 'Power2.easeOut',
                         onComplete: () => {
                             this.mistakeGraphics.clear();
+                            // Clear flag to re-enable user interactions
+                            this.isShowingMistakeEffect = false;
                         }
                     });
                 });
