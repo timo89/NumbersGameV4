@@ -4,8 +4,9 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Game constants
         this.GRID_SIZE = 6;
-        this.TILE_SIZE = 80;
-        this.TILE_SPACING = 5;
+        this.CELL_SIZE = 80;           // Size of each grid cell
+        this.TILE_SIZE = 70;           // Size of the tile within the cell
+        this.TILE_SPACING = 5;         // Deprecated - using cell-based positioning now
         this.CANVAS_PADDING = 15;
         
         // Game state
@@ -59,8 +60,13 @@ class NumbersGameScene extends Phaser.Scene {
         this.pathGraphics = this.add.graphics();
         this.pathGraphics.setDepth(1000); // Ensure path lines are above tiles
         
+        // Initialize graphics object for grid lines
+        this.gridGraphics = this.add.graphics();
+        this.gridGraphics.setDepth(-1); // Ensure grid lines are behind tiles
+        
         // Initialize game
         this.generateGrid();
+        this.drawGrid();
         this.createTileSprites();
         this.updateDisplay();
         this.startGame();
@@ -109,6 +115,35 @@ class NumbersGameScene extends Phaser.Scene {
         return value;
     }
 
+    drawGrid() {
+        if (!this.gridGraphics) return;
+        
+        this.gridGraphics.clear();
+        this.gridGraphics.lineStyle(2, 0x000000, 1); // Black grid lines, 2px thick
+        
+        // Calculate grid dimensions
+        const gridWidth = this.GRID_SIZE * this.CELL_SIZE;
+        const gridHeight = this.GRID_SIZE * this.CELL_SIZE;
+        const startX = this.CANVAS_PADDING;
+        const startY = this.CANVAS_PADDING;
+        
+        // Draw vertical lines
+        for (let i = 0; i <= this.GRID_SIZE; i++) {
+            const x = startX + i * this.CELL_SIZE;
+            this.gridGraphics.moveTo(x, startY);
+            this.gridGraphics.lineTo(x, startY + gridHeight);
+        }
+        
+        // Draw horizontal lines
+        for (let i = 0; i <= this.GRID_SIZE; i++) {
+            const y = startY + i * this.CELL_SIZE;
+            this.gridGraphics.moveTo(startX, y);
+            this.gridGraphics.lineTo(startX + gridWidth, y);
+        }
+        
+        this.gridGraphics.strokePath();
+    }
+
     createTileSprites() {
         // Clear existing sprites
         if (this.tileSprites.length > 0) {
@@ -125,8 +160,15 @@ class NumbersGameScene extends Phaser.Scene {
         for (let row = 0; row < this.GRID_SIZE; row++) {
             this.tileSprites[row] = [];
             for (let col = 0; col < this.GRID_SIZE; col++) {
-                const x = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
-                const y = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
+                // Calculate cell position
+                const cellX = this.CANVAS_PADDING + col * this.CELL_SIZE;
+                const cellY = this.CANVAS_PADDING + row * this.CELL_SIZE;
+                
+                // Center tile within cell with padding
+                const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+                const tileX = cellX + tilePadding;
+                const tileY = cellY + tilePadding;
+                
                 const value = this.grid[row][col];
                 
                 // If tile is empty (null), create invisible placeholder
@@ -137,8 +179,8 @@ class NumbersGameScene extends Phaser.Scene {
                 
                 // Create tile background rectangle
                 const bg = this.add.rectangle(
-                    x + this.TILE_SIZE / 2, 
-                    y + this.TILE_SIZE / 2, 
+                    tileX + this.TILE_SIZE / 2, 
+                    tileY + this.TILE_SIZE / 2, 
                     this.TILE_SIZE, 
                     this.TILE_SIZE, 
                     this.getTileColor(value)
@@ -149,8 +191,8 @@ class NumbersGameScene extends Phaser.Scene {
                 // Create tile text with proper contrast color
                 const textColor = this.getContrastTextColorString(value);
                 const text = this.add.text(
-                    x + this.TILE_SIZE / 2, 
-                    y + this.TILE_SIZE / 2, 
+                    tileX + this.TILE_SIZE / 2, 
+                    tileY + this.TILE_SIZE / 2, 
                     value.toString(), 
                     {
                         fontSize: '24px',
@@ -273,14 +315,21 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     getTileAt(x, y) {
-        const col = Math.floor((x - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
-        const row = Math.floor((y - this.CANVAS_PADDING) / (this.TILE_SIZE + this.TILE_SPACING));
+        // Calculate which cell the click is in
+        const col = Math.floor((x - this.CANVAS_PADDING) / this.CELL_SIZE);
+        const row = Math.floor((y - this.CANVAS_PADDING) / this.CELL_SIZE);
         
         if (row >= 0 && row < this.GRID_SIZE && col >= 0 && col < this.GRID_SIZE) {
-            // Check if click is within tile bounds
-            const tileX = this.CANVAS_PADDING + col * (this.TILE_SIZE + this.TILE_SPACING);
-            const tileY = this.CANVAS_PADDING + row * (this.TILE_SIZE + this.TILE_SPACING);
+            // Calculate cell position
+            const cellX = this.CANVAS_PADDING + col * this.CELL_SIZE;
+            const cellY = this.CANVAS_PADDING + row * this.CELL_SIZE;
             
+            // Calculate tile position within cell
+            const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+            const tileX = cellX + tilePadding;
+            const tileY = cellY + tilePadding;
+            
+            // Check if click is within tile bounds (not just cell bounds)
             if (x >= tileX && x <= tileX + this.TILE_SIZE &&
                 y >= tileY && y <= tileY + this.TILE_SIZE) {
                 return { row, col };
@@ -515,8 +564,18 @@ class NumbersGameScene extends Phaser.Scene {
             
             for (let i = 0; i < this.selectedPath.length; i++) {
                 const tile = this.selectedPath[i];
-                const x = this.CANVAS_PADDING + tile.col * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
-                const y = this.CANVAS_PADDING + tile.row * (this.TILE_SIZE + this.TILE_SPACING) + this.TILE_SIZE / 2;
+                
+                // Calculate cell position
+                const cellX = this.CANVAS_PADDING + tile.col * this.CELL_SIZE;
+                const cellY = this.CANVAS_PADDING + tile.row * this.CELL_SIZE;
+                
+                // Center of tile within cell
+                const tilePadding = (this.CELL_SIZE - this.TILE_SIZE) / 2;
+                const tileX = cellX + tilePadding;
+                const tileY = cellY + tilePadding;
+                
+                const x = tileX + this.TILE_SIZE / 2;
+                const y = tileY + this.TILE_SIZE / 2;
                 
                 if (i === 0) {
                     this.pathGraphics.beginPath();
@@ -738,6 +797,7 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Regenerate grid
         this.generateGrid();
+        this.drawGrid();
         this.createTileSprites();
         this.updateDisplay();
         
