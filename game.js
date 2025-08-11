@@ -716,7 +716,10 @@ class NumbersGameScene extends Phaser.Scene {
     processInvalidPath() {
         // Calculate penalty using the exact same logic as for getting points, but divide by 2
         const pathScore = this.calculatePathScore();
-        this.score = Math.max(0, this.score - (pathScore / 2)); // Don't let score go below 0
+        this.score = Math.max(0, this.score - Math.ceil(pathScore / 2)); // Don't let score go below 0, round up penalty
+        
+        // Update display immediately when score changes
+        this.updateDisplay();
         
         // Play failure sound
         this.playFailureSound();
