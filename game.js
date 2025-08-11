@@ -71,7 +71,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.GAME_HEIGHT = gameSize;
         
         // Calculate font size proportionally
-        this.FONT_SIZE = Math.round(this.TILE_SIZE * 0.34); // 24/70 ≈ 0.34
+        this.FONT_SIZE = Math.round(this.TILE_SIZE * 0.50); // Increased from 0.34 to make numbers bigger
     }
 
     preload() {
