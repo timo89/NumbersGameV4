@@ -33,6 +33,9 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Timer
         this.gameTimer = null;
+        
+        // Audio context for sound effects
+        this.audioContext = null;
     }
 
     preload() {
@@ -40,6 +43,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     create() {
+        // Initialize audio context for sound effects
+        this.initializeAudio();
+        
         // Initialize UI elements
         this.scoreEl = document.getElementById('score');
         this.levelEl = document.getElementById('level');
@@ -626,6 +632,9 @@ class NumbersGameScene extends Phaser.Scene {
         if (this.isProcessingValidPath) return;
         this.isProcessingValidPath = true;
         
+        // Play success sound
+        this.playSuccessSound();
+        
         // Clear the path line immediately after win
         this.pathGraphics.clear();
         
@@ -646,6 +655,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     processInvalidPath() {
+        // Play failure sound
+        this.playFailureSound();
+        
         // Shake the board on failure
         this.cameras.main.shake(300, 0.01);
         
@@ -812,6 +824,75 @@ class NumbersGameScene extends Phaser.Scene {
         this.updateDisplay();
         
         this.startGame();
+    }
+
+    initializeAudio() {
+        try {
+            // Initialize Web Audio API context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (error) {
+            console.warn('Web Audio API not supported:', error);
+            this.audioContext = null;
+        }
+    }
+
+    playSuccessSound() {
+        if (!this.audioContext) return;
+        
+        try {
+            // Create a pleasant ascending chord for success
+            const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
+            const duration = 0.3;
+            
+            frequencies.forEach((freq, index) => {
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+                oscillator.type = 'sine';
+                
+                // Fade in and out for smooth sound
+                gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime + index * 0.05);
+                oscillator.stop(this.audioContext.currentTime + duration + index * 0.05);
+            });
+        } catch (error) {
+            console.warn('Error playing success sound:', error);
+        }
+    }
+
+    playFailureSound() {
+        if (!this.audioContext) return;
+        
+        try {
+            // Create a short descending buzz for failure
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Start at 200Hz and drop to 100Hz
+            oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.3);
+            oscillator.type = 'sawtooth';
+            
+            // Quick fade in and out
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.3);
+        } catch (error) {
+            console.warn('Error playing failure sound:', error);
+        }
     }
 
     updateDisplay() {
