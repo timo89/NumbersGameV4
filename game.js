@@ -629,34 +629,22 @@ class NumbersGameScene extends Phaser.Scene {
             localStorage.setItem('numbersGameHighScore', this.highScore.toString());
         }
         
-        // Show success feedback
-        this.showFeedback('Success!', 'success');
+
         
         // Animate tiles out then clear and regenerate
         this.animateSelectedTilesOut();
     }
 
     processInvalidPath() {
-        // Show failure feedback
-        this.showFeedback('Invalid path!', 'failure');
+        // Shake the board on failure
+        this.cameras.main.shake(300, 0.01);
         
         // Clear the path
         this.clearPath();
         this.updateTileDisplay();
     }
 
-    showFeedback(message, type) {
-        const feedback = document.createElement('div');
-        feedback.className = `feedback ${type}`;
-        feedback.textContent = message;
-        document.body.appendChild(feedback);
-        
-        setTimeout(() => {
-            if (document.body.contains(feedback)) {
-                document.body.removeChild(feedback);
-            }
-        }, 1000);
-    }
+
 
     animateSelectedTilesOut() {
         const tilesToAnimate = [];
