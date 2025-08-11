@@ -668,6 +668,23 @@ class NumbersGameScene extends Phaser.Scene {
         return this.selectedPath.length >= 2 && this.currentSum % 5 === 0;
     }
 
+    /**
+     * Calculate the score for a path using the game's scoring formula
+     */
+    calculatePathScore() {
+        let baseScore;
+        if (this.currentSum === 0) {
+            // For sum of 0, give 1 point
+            baseScore = 1;
+        } else {
+            // For other sums: (absolute value / 5) + 1
+            baseScore = Math.abs(this.currentSum) / 5 + 1;
+        }
+        
+        // Factor in path length by multiplying
+        return baseScore * this.selectedPath.length;
+    }
+
     processValidPath() {
         // Prevent multiple executions
         if (this.isProcessingValidPath) return;
@@ -679,18 +696,8 @@ class NumbersGameScene extends Phaser.Scene {
         // Clear the path line immediately after win
         this.pathGraphics.clear();
         
-        // Calculate score using new formula
-        let baseScore;
-        if (this.currentSum === 0) {
-            // For sum of 0, give 1 point
-            baseScore = 1;
-        } else {
-            // For other sums: (absolute value / 5) + 1
-            baseScore = Math.abs(this.currentSum) / 5 + 1;
-        }
-        
-        // Factor in path length by multiplying
-        const pathScore = baseScore * this.selectedPath.length;
+        // Calculate and add score
+        const pathScore = this.calculatePathScore();
         this.score += pathScore;
         
         // Update high score
@@ -706,6 +713,10 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     processInvalidPath() {
+        // Calculate penalty using the exact same logic as for getting points
+        const pathScore = this.calculatePathScore();
+        this.score = Math.max(0, this.score - pathScore); // Don't let score go below 0
+        
         // Play failure sound
         this.playFailureSound();
         
