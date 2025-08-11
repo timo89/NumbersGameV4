@@ -4,10 +4,11 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Game constants
         this.GRID_SIZE = 6;
-        this.CELL_SIZE = 80;           // Size of each grid cell
-        this.TILE_SIZE = 70;           // Size of the tile within the cell
+        
+        // Calculate dynamic sizing based on viewport
+        this.calculateDynamicSizing();
+        
         this.TILE_SPACING = 5;         // Deprecated - using cell-based positioning now
-        this.CANVAS_PADDING = 25;
         
         // Game state
         this.grid = [];
@@ -36,6 +37,41 @@ class NumbersGameScene extends Phaser.Scene {
         
         // Audio context for sound effects
         this.audioContext = null;
+    }
+
+    /**
+     * Calculate dynamic sizing based on viewport dimensions
+     */
+    calculateDynamicSizing() {
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Account for UI elements (controls, header, path info) - approximately 200px
+        const availableHeight = viewportHeight - 200;
+        
+        // Use smaller dimension but leave some margin (20px each side)
+        const availableSize = Math.min(viewportWidth - 40, availableHeight - 40);
+        
+        // Ensure minimum and maximum sizes
+        const minSize = 280; // Minimum for usability
+        const maxSize = 530; // Current size as maximum
+        
+        const gameSize = Math.max(minSize, Math.min(maxSize, availableSize));
+        
+        // Calculate cell and tile sizes based on game size
+        // Game size = (GRID_SIZE * CELL_SIZE) + (2 * CANVAS_PADDING)
+        // So CELL_SIZE = (gameSize - 2 * CANVAS_PADDING) / GRID_SIZE
+        this.CANVAS_PADDING = Math.round(gameSize * 0.047); // Proportional padding (25/530 ≈ 0.047)
+        this.CELL_SIZE = Math.round((gameSize - 2 * this.CANVAS_PADDING) / this.GRID_SIZE);
+        this.TILE_SIZE = Math.round(this.CELL_SIZE * 0.875); // 70/80 = 0.875
+        
+        // Store calculated dimensions
+        this.GAME_WIDTH = gameSize;
+        this.GAME_HEIGHT = gameSize;
+        
+        // Calculate font size proportionally
+        this.FONT_SIZE = Math.round(this.TILE_SIZE * 0.34); // 24/70 ≈ 0.34
     }
 
     preload() {
@@ -202,7 +238,7 @@ class NumbersGameScene extends Phaser.Scene {
                     tileY + this.TILE_SIZE / 2, 
                     value.toString(), 
                     {
-                        fontSize: '24px',
+                        fontSize: `${this.FONT_SIZE}px`,
                         fontFamily: 'Comic Sans MS',
                         fontStyle: 'bold',
                         color: textColor,
@@ -934,23 +970,29 @@ class NumbersGameScene extends Phaser.Scene {
     }
 }
 
-// Phaser game configuration
-const config = {
-    type: Phaser.AUTO,
-    width: 530,
-    height: 530,
-    parent: 'gameContainer',
-    backgroundColor: '#ffffff',
-    scene: NumbersGameScene,
-    physics: {
-        default: 'arcade',
-        arcade: {
-            debug: false
+// Function to create dynamic Phaser game configuration
+function createGameConfig() {
+    // Create a temporary scene instance to calculate dimensions
+    const tempScene = new NumbersGameScene();
+    
+    return {
+        type: Phaser.AUTO,
+        width: tempScene.GAME_WIDTH,
+        height: tempScene.GAME_HEIGHT,
+        parent: 'gameContainer',
+        backgroundColor: '#ffffff',
+        scene: NumbersGameScene,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                debug: false
+            }
         }
-    }
-};
+    };
+}
 
 // Start the game when the page loads
 document.addEventListener('DOMContentLoaded', () => {
+    const config = createGameConfig();
     window.game = new Phaser.Game(config);
 });
