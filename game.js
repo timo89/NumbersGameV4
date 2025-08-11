@@ -751,7 +751,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     togglePause() {
         this.isPaused = !this.isPaused;
-        this.pauseBtn.textContent = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
+        this.pauseBtn.textContent = this.isPaused ? '▶️' : '⏸️';
         
         if (this.isPaused) {
             this.scene.pause();
@@ -762,7 +762,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     toggleFlipMode() {
         this.isFlipMode = !this.isFlipMode;
-        this.flipBtn.textContent = this.isFlipMode ? '🎯 Select Mode' : '🔄 Flip Mode';
+        this.flipBtn.textContent = this.isFlipMode ? '🎯' : '🔄';
         this.flipBtn.classList.toggle('active', this.isFlipMode);
         
         if (this.isFlipMode) {
@@ -782,8 +782,8 @@ class NumbersGameScene extends Phaser.Scene {
         this.isProcessingValidPath = false;
         
         // Reset UI
-        this.pauseBtn.textContent = '⏸️ Pause';
-        this.flipBtn.textContent = '🔄 Flip Mode';
+        this.pauseBtn.textContent = '⏸️';
+        this.flipBtn.textContent = '🔄';
         this.flipBtn.classList.remove('active');
         
         // Stop timer
