@@ -536,19 +536,29 @@ class NumbersGameScene extends Phaser.Scene {
                     continue;
                 }
                 
-                if (isSelected && this.isDragging) {
-                    // Dim the tile by using a darker version of its original color
-                    const originalColor = this.getTileColor(value);
-                    const dimmedColor = this.darkenColor(originalColor, 0.7);
-                    tile.bg.setFillStyle(dimmedColor);
-                    tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border for selection
-                    // Adjust text color for dimmed background
-                    tile.text.setColor(this.getContrastTextColorString(value));
-                } else {
-                    tile.bg.setFillStyle(this.getTileColor(value));
+                // If game is paused, gray out all tiles and hide numbers
+                if (this.isPaused) {
+                    tile.bg.setFillStyle(0x808080); // Gray background
                     tile.bg.setStrokeStyle(1, 0x333333);
-                    // Update text color for normal state
-                    tile.text.setColor(this.getContrastTextColorString(value));
+                    tile.text.setVisible(false); // Hide the numbers
+                } else {
+                    // Show the numbers when not paused
+                    tile.text.setVisible(true);
+                    
+                    if (isSelected && this.isDragging) {
+                        // Dim the tile by using a darker version of its original color
+                        const originalColor = this.getTileColor(value);
+                        const dimmedColor = this.darkenColor(originalColor, 0.7);
+                        tile.bg.setFillStyle(dimmedColor);
+                        tile.bg.setStrokeStyle(3, 0xFF9800); // Orange border for selection
+                        // Adjust text color for dimmed background
+                        tile.text.setColor(this.getContrastTextColorString(value));
+                    } else {
+                        tile.bg.setFillStyle(this.getTileColor(value));
+                        tile.bg.setStrokeStyle(1, 0x333333);
+                        // Update text color for normal state
+                        tile.text.setColor(this.getContrastTextColorString(value));
+                    }
                 }
             }
         }
@@ -758,6 +768,9 @@ class NumbersGameScene extends Phaser.Scene {
         } else {
             this.scene.resume();
         }
+        
+        // Update tile display to show/hide numbers based on pause state
+        this.updateTileDisplay();
     }
 
     toggleFlipMode() {
