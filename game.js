@@ -242,7 +242,8 @@ class NumbersGameScene extends Phaser.Scene {
                         fontFamily: 'Comic Sans MS',
                         fontStyle: 'bold',
                         color: textColor,
-                        align: 'center'
+                        align: 'center',
+                        resolution: window.devicePixelRatio || 1
                     }
                 );
                 text.setOrigin(0.5, 0.5);
@@ -981,7 +982,17 @@ function createGameConfig() {
         height: tempScene.GAME_HEIGHT,
         parent: 'gameContainer',
         backgroundColor: '#ffffff',
+        resolution: window.devicePixelRatio || 1,
         scene: NumbersGameScene,
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        render: {
+            antialias: true,
+            pixelArt: false,
+            roundPixels: false
+        },
         physics: {
             default: 'arcade',
             arcade: {
