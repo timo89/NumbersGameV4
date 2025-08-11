@@ -7,7 +7,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.CELL_SIZE = 80;           // Size of each grid cell
         this.TILE_SIZE = 70;           // Size of the tile within the cell
         this.TILE_SPACING = 5;         // Deprecated - using cell-based positioning now
-        this.CANVAS_PADDING = 15;
+        this.CANVAS_PADDING = 25;
         
         // Game state
         this.grid = [];
@@ -203,7 +203,7 @@ class NumbersGameScene extends Phaser.Scene {
                     value.toString(), 
                     {
                         fontSize: '24px',
-                        fontFamily: 'Arial',
+                        fontFamily: 'Comic Sans MS',
                         fontStyle: 'bold',
                         color: textColor,
                         align: 'center'
