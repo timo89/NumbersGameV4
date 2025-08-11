@@ -27,6 +27,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.lastFlipTime = 0;
         this.flipDebounceMs = 100;
         this.isProcessingValidPath = false;
+        this.isShowingMistakeEffect = false;
         
         // Phaser objects
         this.tileSprites = [];
@@ -71,7 +72,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.GAME_HEIGHT = gameSize;
         
         // Calculate font size proportionally
-        this.FONT_SIZE = Math.round(this.TILE_SIZE * 0.34); // 24/70 ≈ 0.34
+        this.FONT_SIZE = Math.round(this.TILE_SIZE * 0.50); // Increased from 0.34 to make numbers bigger
     }
 
     preload() {
@@ -106,6 +107,10 @@ class NumbersGameScene extends Phaser.Scene {
         // Initialize graphics object for grid lines
         this.gridGraphics = this.add.graphics();
         this.gridGraphics.setDepth(-1); // Ensure grid lines are behind tiles
+        
+        // Initialize graphics object for mistake effects
+        this.mistakeGraphics = this.add.graphics();
+        this.mistakeGraphics.setDepth(1500); // Above everything, including path lines
         
         // Initialize game
         this.generateGrid();
@@ -239,7 +244,7 @@ class NumbersGameScene extends Phaser.Scene {
                     value.toString(), 
                     {
                         fontSize: `${this.FONT_SIZE}px`,
-                        fontFamily: 'Comic Sans MS',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif',
                         fontStyle: 'bold',
                         color: textColor,
                         align: 'center',
@@ -383,7 +388,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
@@ -408,7 +413,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerMove(pointer) {
-        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        if (this.isPaused || this.isFlipMode || !this.isDragging || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(pointer.x, pointer.y);
         if (!tile) return;
@@ -423,7 +428,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handlePointerUp(pointer) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         if (!this.isFlipMode) {
             // Reset our custom dragging flag
@@ -436,7 +441,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     // Canvas mouse event handlers (alternative to Phaser pointer events)
     handleCanvasMouseDown(e) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         // Check if this event was already handled by Phaser
         if (this.handledByPhaser) {
@@ -462,7 +467,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasMouseMove(e) {
-        if (this.isPaused || this.isFlipMode || !this.isDragging) return;
+        if (this.isPaused || this.isFlipMode || !this.isDragging || this.isShowingMistakeEffect) return;
         
         const tile = this.getTileAt(e.offsetX, e.offsetY);
         if (!tile) return;
@@ -478,7 +483,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     handleCanvasMouseUp(e) {
-        if (this.isPaused) return;
+        if (this.isPaused || this.isShowingMistakeEffect) return;
         
         if (!this.isFlipMode) {
             this.isDragging = false;
@@ -661,7 +666,24 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     isValidPath() {
-        return this.currentSum % 5 === 0;
+        return this.selectedPath.length >= 2 && this.currentSum % 5 === 0;
+    }
+
+    /**
+     * Calculate the score for a path using the game's scoring formula
+     */
+    calculatePathScore() {
+        let baseScore;
+        if (this.currentSum === 0) {
+            // For sum of 0, give 1 point
+            baseScore = 1;
+        } else {
+            // For other sums: (absolute value / 5) + 1
+            baseScore = Math.abs(this.currentSum) / 5 + 1;
+        }
+        
+        // Factor in path length by multiplying
+        return baseScore * this.selectedPath.length;
     }
 
     processValidPath() {
@@ -675,18 +697,8 @@ class NumbersGameScene extends Phaser.Scene {
         // Clear the path line immediately after win
         this.pathGraphics.clear();
         
-        // Calculate score using new formula
-        let baseScore;
-        if (this.currentSum === 0) {
-            // For sum of 0, give 1 point
-            baseScore = 1;
-        } else {
-            // For other sums: (absolute value / 5) + 1
-            baseScore = Math.abs(this.currentSum) / 5 + 1;
-        }
-        
-        // Factor in path length by multiplying
-        const pathScore = baseScore * this.selectedPath.length;
+        // Calculate and add score
+        const pathScore = this.calculatePathScore();
         this.score += pathScore;
         
         // Update high score
@@ -702,8 +714,15 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     processInvalidPath() {
+        // Calculate penalty using the exact same logic as for getting points, but divide by 2
+        const pathScore = this.calculatePathScore();
+        this.score = Math.max(0, this.score - (pathScore / 2)); // Don't let score go below 0
+        
         // Play failure sound
         this.playFailureSound();
+        
+        // Show red zig-zag mistake effect
+        this.showMistakeEffect();
         
         // Shake the board on failure
         this.cameras.main.shake(300, 0.01);
@@ -711,6 +730,136 @@ class NumbersGameScene extends Phaser.Scene {
         // Clear the path
         this.clearPath();
         this.updateTileDisplay();
+    }
+
+    /**
+     * Draw red zig-zag lines across the board to indicate a mistake
+     */
+    drawMistakeEffect() {
+        if (!this.mistakeGraphics) return;
+        
+        this.mistakeGraphics.clear();
+        
+        // Calculate board boundaries
+        const boardLeft = this.CANVAS_PADDING;
+        const boardTop = this.CANVAS_PADDING;
+        const boardRight = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
+        const boardBottom = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
+        
+        // Set up red color with transparency
+        this.mistakeGraphics.lineStyle(4, 0xFF0000, 0.8); // Red, semi-transparent
+        
+        // Draw diagonal zig-zag lines from top-left to bottom-right
+        const zigzagSpacing = 40; // Distance between zig-zag lines
+        const zigzagAmplitude = 20; // Height of zig-zag peaks
+        const zigzagFrequency = 30; // Distance between peaks
+        
+        // Draw multiple diagonal zig-zag lines
+        for (let offset = -boardRight; offset < boardRight + boardBottom; offset += zigzagSpacing) {
+            this.mistakeGraphics.beginPath();
+            
+            let startX = boardLeft + offset;
+            let startY = boardTop;
+            
+            // Adjust start position if line starts outside board
+            if (startX < boardLeft) {
+                const yOffset = (boardLeft - startX);
+                startX = boardLeft;
+                startY = boardTop + yOffset;
+            }
+            
+            // Draw zig-zag line
+            let currentX = startX;
+            let currentY = startY;
+            let zigzagUp = true;
+            
+            this.mistakeGraphics.moveTo(currentX, currentY);
+            
+            while (currentX < boardRight && currentY < boardBottom) {
+                const nextX = Math.min(currentX + zigzagFrequency, boardRight);
+                const nextY = Math.min(currentY + zigzagFrequency, boardBottom);
+                
+                // Add zig-zag pattern
+                const midX = currentX + (nextX - currentX) / 2;
+                const midY = currentY + (nextY - currentY) / 2;
+                const zigzagOffset = zigzagUp ? -zigzagAmplitude : zigzagAmplitude;
+                
+                // Calculate perpendicular offset for zig-zag
+                const angle = Math.atan2(nextY - currentY, nextX - currentX);
+                const perpAngle = angle + Math.PI / 2;
+                const zigzagX = midX + Math.cos(perpAngle) * zigzagOffset;
+                const zigzagY = midY + Math.sin(perpAngle) * zigzagOffset;
+                
+                this.mistakeGraphics.lineTo(zigzagX, zigzagY);
+                this.mistakeGraphics.lineTo(nextX, nextY);
+                
+                currentX = nextX;
+                currentY = nextY;
+                zigzagUp = !zigzagUp;
+            }
+            
+            this.mistakeGraphics.strokePath();
+        }
+        
+        // Draw additional visual effects - red X pattern in corners
+        this.mistakeGraphics.lineStyle(6, 0xFF4444, 0.6);
+        
+        // Top-left to bottom-right X
+        this.mistakeGraphics.beginPath();
+        this.mistakeGraphics.moveTo(boardLeft + 10, boardTop + 10);
+        this.mistakeGraphics.lineTo(boardRight - 10, boardBottom - 10);
+        this.mistakeGraphics.strokePath();
+        
+        // Top-right to bottom-left X
+        this.mistakeGraphics.beginPath();
+        this.mistakeGraphics.moveTo(boardRight - 10, boardTop + 10);
+        this.mistakeGraphics.lineTo(boardLeft + 10, boardBottom - 10);
+        this.mistakeGraphics.strokePath();
+        
+        // Add red border around the entire board
+        this.mistakeGraphics.lineStyle(3, 0xFF0000, 0.7);
+        this.mistakeGraphics.strokeRect(boardLeft, boardTop, boardRight - boardLeft, boardBottom - boardTop);
+    }
+
+    /**
+     * Show mistake effect with animation
+     */
+    showMistakeEffect() {
+        // Set flag to block user interactions during mistake effect
+        this.isShowingMistakeEffect = true;
+        
+        // Draw the mistake effect
+        this.drawMistakeEffect();
+        
+        // Start with invisible and scale up
+        this.mistakeGraphics.setAlpha(0);
+        this.mistakeGraphics.setScale(0.8);
+        
+        // Animate in
+        this.tweens.add({
+            targets: this.mistakeGraphics,
+            alpha: 1,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                // Hold for a moment, then fade out
+                this.time.delayedCall(1000, () => {
+                    this.tweens.add({
+                        targets: this.mistakeGraphics,
+                        alpha: 0,
+                        duration: 500,
+                        ease: 'Power2.easeOut',
+                        onComplete: () => {
+                            this.mistakeGraphics.clear();
+                            // Clear flag to re-enable user interactions
+                            this.isShowingMistakeEffect = false;
+                        }
+                    });
+                });
+            }
+        });
     }
 
 
