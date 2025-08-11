@@ -675,8 +675,18 @@ class NumbersGameScene extends Phaser.Scene {
         // Clear the path line immediately after win
         this.pathGraphics.clear();
         
-        // Calculate score (absolute value of sum)
-        const pathScore = Math.abs(this.currentSum);
+        // Calculate score using new formula
+        let baseScore;
+        if (this.currentSum === 0) {
+            // For sum of 0, give 1 point
+            baseScore = 1;
+        } else {
+            // For other sums: (absolute value / 5) + 1
+            baseScore = Math.abs(this.currentSum) / 5 + 1;
+        }
+        
+        // Factor in path length by multiplying
+        const pathScore = baseScore * this.selectedPath.length;
         this.score += pathScore;
         
         // Update high score
