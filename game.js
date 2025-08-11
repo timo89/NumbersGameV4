@@ -243,7 +243,7 @@ class NumbersGameScene extends Phaser.Scene {
                     value.toString(), 
                     {
                         fontSize: `${this.FONT_SIZE}px`,
-                        fontFamily: 'Comic Sans MS',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif',
                         fontStyle: 'bold',
                         color: textColor,
                         align: 'center',
