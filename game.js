@@ -9,8 +9,6 @@ function setInGameUIVisible(visible) {
     if (pathInfo) pathInfo.classList[method]('hidden');
 }
 
-// Make OptionsScene available to ES module bootstrap
-window.OptionsScene = OptionsScene;
 
 // Main Menu Scene
 class MainMenuScene extends Phaser.Scene {
@@ -1930,9 +1928,9 @@ function createGameConfig() {
             default: 'arcade',
             arcade: {
                 debug: false
+            }
         }
-    }
-};
+    };
 }
 
 // Start the game when the page loads, unless module bootstrap is active
