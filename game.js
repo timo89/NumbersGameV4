@@ -9,6 +9,9 @@ function setInGameUIVisible(visible) {
     if (pathInfo) pathInfo.classList[method]('hidden');
 }
 
+// Make OptionsScene available to ES module bootstrap
+window.OptionsScene = OptionsScene;
+
 // Main Menu Scene
 class MainMenuScene extends Phaser.Scene {
     constructor() {
@@ -700,6 +703,9 @@ class OptionsScene extends Phaser.Scene {
         }
     }
 }
+
+// Expose legacy scenes to window for ES module bootstrap compatibility
+window.OptionsScene = OptionsScene;
 
 class NumbersGameScene extends Phaser.Scene {
     constructor() {
@@ -1895,6 +1901,9 @@ class NumbersGameScene extends Phaser.Scene {
     }
 }
 
+// Make NumbersGameScene available to ES module bootstrap
+window.NumbersGameScene = NumbersGameScene;
+
 // Function to create dynamic Phaser game configuration
 function createGameConfig() {
     // Create a temporary scene instance to calculate dimensions
@@ -1921,13 +1930,14 @@ function createGameConfig() {
             default: 'arcade',
             arcade: {
                 debug: false
-            }
         }
-    };
+    }
+};
 }
 
-// Start the game when the page loads
+// Start the game when the page loads, unless module bootstrap is active
 document.addEventListener('DOMContentLoaded', () => {
-    const config = createGameConfig();
-    window.game = new Phaser.Game(config);
+if (window.__MODULE_BOOTSTRAP__) return;
+const config = createGameConfig();
+window.game = new Phaser.Game(config);
 });
