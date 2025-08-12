@@ -1,3 +1,107 @@
+// Utility to toggle visibility of in-game DOM UI from any scene
+function setInGameUIVisible(visible) {
+    const controls = document.querySelector('.controls');
+    const header = document.querySelector('.game-header');
+    const pathInfo = document.getElementById('pathInfo');
+    const method = visible ? 'remove' : 'add';
+    if (controls) controls.classList[method]('hidden');
+    if (header) header.classList[method]('hidden');
+    if (pathInfo) pathInfo.classList[method]('hidden');
+}
+
+// Main Menu Scene
+class MainMenuScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'MainMenuScene' });
+    }
+
+    create() {
+        // Ensure in-game UI is hidden while on the menu
+        setInGameUIVisible(false);
+
+        const { width, height } = this.scale;
+        const title = this.add.text(width / 2, height / 2 - 80, 'Numbers Game', {
+            fontFamily: 'sans-serif',
+            fontSize: '48px',
+            color: '#222',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        const startBtn = this.add.text(width / 2, height / 2 + 0, 'Start Game', {
+            fontFamily: 'sans-serif',
+            fontSize: '28px',
+            color: '#ffffff',
+            backgroundColor: '#4CAF50',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        const optionsBtn = this.add.text(width / 2, height / 2 + 60, 'Options', {
+            fontFamily: 'sans-serif',
+            fontSize: '24px',
+            color: '#ffffff',
+            backgroundColor: '#2196F3',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        startBtn.on('pointerup', () => {
+            this.scene.start('NumbersGameScene');
+        });
+
+        optionsBtn.on('pointerup', () => {
+            this.scene.start('OptionsScene');
+        });
+    }
+}
+
+// Options Scene
+class OptionsScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'OptionsScene' });
+    }
+
+    create() {
+        setInGameUIVisible(false);
+
+        const { width, height } = this.scale;
+        this.add.text(width / 2, height / 2 - 120, 'Options', {
+            fontFamily: 'sans-serif',
+            fontSize: '40px',
+            color: '#222',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Audio toggle persisted in localStorage
+        const audioKey = 'numbersGameAudio';
+        const isAudioOn = (localStorage.getItem(audioKey) ?? '1') !== '0';
+        let audioLabel = this.add.text(width / 2, height / 2 - 20, `Audio: ${isAudioOn ? 'On' : 'Off'}`, {
+            fontFamily: 'sans-serif',
+            fontSize: '24px',
+            color: '#ffffff',
+            backgroundColor: '#9C27B0',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        audioLabel.on('pointerup', () => {
+            const current = (localStorage.getItem(audioKey) ?? '1') !== '0';
+            const next = current ? '0' : '1';
+            localStorage.setItem(audioKey, next);
+            audioLabel.setText(`Audio: ${next !== '0' ? 'On' : 'Off'}`);
+        });
+
+        const backBtn = this.add.text(width / 2, height / 2 + 60, 'Back', {
+            fontFamily: 'sans-serif',
+            fontSize: '24px',
+            color: '#ffffff',
+            backgroundColor: '#607D8B',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        backBtn.on('pointerup', () => {
+            this.scene.start('MainMenuScene');
+        });
+    }
+}
+
 class NumbersGameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'NumbersGameScene' });
@@ -38,7 +142,8 @@ class NumbersGameScene extends Phaser.Scene {
 
         // Audio context for sound effects
         this.audioContext = null;
-        this.audioEnabled = true;
+        // Respect persisted audio option (default on)
+        this.audioEnabled = (localStorage.getItem('numbersGameAudio') ?? '1') !== '0';
         this.audioContextResumed = false;
     }
 
@@ -82,6 +187,8 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     create() {
+        // Show in-game UI when entering the game scene
+        setInGameUIVisible(true);
         // Initialize audio context for sound effects
         this.initializeAudio();
 
@@ -1200,7 +1307,7 @@ function createGameConfig() {
         parent: 'gameContainer',
         backgroundColor: '#ffffff',
         resolution: window.devicePixelRatio || 1,
-        scene: NumbersGameScene,
+        scene: [MainMenuScene, OptionsScene, NumbersGameScene],
         scale: {
             mode: Phaser.Scale.FIT,
             autoCenter: Phaser.Scale.CENTER_BOTH

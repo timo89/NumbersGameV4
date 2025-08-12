@@ -96,24 +96,26 @@
             margin: 0 !important; /* Override Phaser's automatic margin */
         }
         
+        /* Utility */
+        .hidden { display: none !important; }
 
     </style>
 </head>
 <body>
-    <div class="controls">
+    <div class="controls hidden">
         <button id="pauseBtn">⏸️</button>
         <button id="flipBtn">🔄</button>
         <button id="resetBtn">🔃</button>
     </div>
     
-    <div class="game-header">
+    <div class="game-header hidden">
         <div class="stat">Score: <span id="score">0</span></div>
         <div class="stat">Level: <span id="level">1</span></div>
         <div class="stat">Time: <span id="time">0:00</span></div>
         <div class="stat">High Score: <span id="highScore">0</span></div>
     </div>
     
-    <div class="path-info" id="pathInfo">
+    <div class="path-info hidden" id="pathInfo">
         Sum: <span id="sum">0</span> | Length: <span id="length">0</span>
     </div>
     
