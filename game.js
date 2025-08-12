@@ -28,99 +28,46 @@ class MainMenuScene extends Phaser.Scene {
         // Create main title with gradient effect and animation
         this.createTitle(width, height);
 
-        // Create stylized buttons with hover effects
+        // Create simple solid buttons (no hover effects)
         this.createMenuButtons(width, height);
-
-        // Add particle effects
-        this.createParticleEffects();
-
-        // Add subtle background music indicator
-        this.createMusicIndicator(width, height);
     }
 
     createAnimatedBackground() {
         const { width, height } = this.scale;
-        
-        // Create gradient background
+
+        // Simple subtle background (minor gradient, no edge borders)
         const bg = this.add.graphics();
-        bg.fillGradientStyle(0x1a1a2e, 0x16213e, 0x0f3460, 0x533483, 1);
+        bg.fillGradientStyle(0x182233, 0x1b263b, 0x1b263b, 0x182233, 1);
         bg.fillRect(0, 0, width, height);
 
-        // Edge vignette using gradient strips
-        const vignette = this.add.graphics();
-        // Top
-        vignette.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 1);
-        vignette.fillRect(0, 0, width, 60);
-        vignette.alpha = 0.15;
-        // Bottom
-        const vignetteBottom = this.add.graphics();
-        vignetteBottom.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 1);
-        vignetteBottom.fillRect(0, height - 60, width, 60);
-        vignetteBottom.alpha = 0.15;
-        // Left
-        const vignetteLeft = this.add.graphics();
-        vignetteLeft.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 1);
-        vignetteLeft.fillRect(0, 0, 60, height);
-        vignetteLeft.alpha = 0.12;
-        // Right
-        const vignetteRight = this.add.graphics();
-        vignetteRight.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 1);
-        vignetteRight.fillRect(width - 60, 0, 60, height);
-        vignetteRight.alpha = 0.12;
+        // Floating numbers: multiples of 5, both positive and negative
+        const values = [];
+        for (let v = 5; v <= 50; v += 5) { values.push(v, -v); }
 
-        // Parallax floating numbers (far layer)
-        for (let i = 0; i < 12; i++) {
-            const number = this.add.text(
+        const makeNumber = (fontSize, alpha, drift, durMin, durMax) => {
+            const val = values[Phaser.Math.Between(0, values.length - 1)].toString();
+            const n = this.add.text(
                 Phaser.Math.Between(0, width),
                 Phaser.Math.Between(0, height),
-                Phaser.Math.Between(1, 9).toString(),
-                {
-                    fontFamily: 'Poppins, Arial, sans-serif',
-                    fontSize: '22px',
-                    color: '#ffffff'
-                }
-            ).setAlpha(0.08);
-            // Improve sharpness
-            if (number.setResolution) number.setResolution(2);
-            number.setPosition(Math.round(number.x), Math.round(number.y));
+                val,
+                { fontFamily: 'Poppins, Arial, sans-serif', fontSize: `${fontSize}px`, color: '#ffffff' }
+            ).setAlpha(alpha).setOrigin(0.5);
+            if (n.setResolution) n.setResolution(2);
+            n.setPosition(Math.round(n.x), Math.round(n.y));
             this.tweens.add({
-                targets: number,
-                y: number.y - 80,
-                alpha: 0.18,
-                duration: Phaser.Math.Between(4000, 7000),
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1,
-                delay: Phaser.Math.Between(0, 2000)
-            });
-        }
-
-        // Parallax floating numbers (near layer)
-        for (let i = 0; i < 10; i++) {
-            const number = this.add.text(
-                Phaser.Math.Between(0, width),
-                Phaser.Math.Between(0, height),
-                Phaser.Math.Between(1, 9).toString(),
-                {
-                    fontFamily: 'Poppins, Arial, sans-serif',
-                    fontSize: '28px',
-                    color: '#ffffff'
-                }
-            ).setAlpha(0.15);
-            // Improve sharpness
-            if (number.setResolution) number.setResolution(2);
-            number.setPosition(Math.round(number.x), Math.round(number.y));
-            this.tweens.add({
-                targets: number,
-                y: number.y - 120,
-                alpha: 0.28,
-                duration: Phaser.Math.Between(3000, 5500),
+                targets: n,
+                y: n.y - drift,
+                alpha: alpha + 0.1,
+                duration: Phaser.Math.Between(durMin, durMax),
                 ease: 'Sine.easeInOut',
                 yoyo: true,
                 repeat: -1,
                 delay: Phaser.Math.Between(0, 1500)
             });
-        }
+        };
+
+        for (let i = 0; i < 10; i++) makeNumber(22, 0.08, 60, 4000, 7000);
+        for (let i = 0; i < 8; i++) makeNumber(28, 0.12, 90, 3500, 6000);
     }
 
     createTitle(width, height) {
@@ -191,158 +138,71 @@ class MainMenuScene extends Phaser.Scene {
     }
 
     createMenuButtons(width, height) {
-        // Start Game Button
-        const startBtnBg = this.add.graphics();
-        startBtnBg.fillGradientStyle(0x4CAF50, 0x4CAF50, 0x2E7D32, 0x2E7D32, 1);
-        startBtnBg.fillRoundedRect(-80, -20, 160, 40, 20);
-        startBtnBg.x = width / 2;
-        startBtnBg.y = height / 2 + 20;
+        const centerX = width / 2;
 
-        const startBtn = this.add.text(width / 2, height / 2 + 20, '🎮 START GAME', {
+        // Common text styles
+        const startText = this.add.text(centerX, height / 2 + 20, 'START GAME', {
             fontFamily: 'Poppins, Arial, sans-serif',
             fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        startBtn.setShadow(0, 3, '#000000', 6, false, true);
 
-        // Options Button
-        const optionsBtnBg = this.add.graphics();
-        optionsBtnBg.fillGradientStyle(0x2196F3, 0x2196F3, 0x1565C0, 0x1565C0, 1);
-        optionsBtnBg.fillRoundedRect(-60, -18, 120, 36, 18);
-        optionsBtnBg.x = width / 2;
-        optionsBtnBg.y = height / 2 + 80;
-
-        const optionsBtn = this.add.text(width / 2, height / 2 + 80, '⚙️ OPTIONS', {
+        const optionsText = this.add.text(centerX, height / 2 + 80, 'OPTIONS', {
             fontFamily: 'Poppins, Arial, sans-serif',
             fontSize: '20px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        optionsBtn.setShadow(0, 3, '#000000', 6, false, true);
 
-        // Button animations and effects
-        this.setupButtonEffects(startBtn, startBtnBg, 0x66BB6A);
-        this.setupButtonEffects(optionsBtn, optionsBtnBg, 0x42A5F5);
+        // Draw solid backgrounds sized to text with padding and a visible border
+        const drawButton = (textObj, color) => {
+            const paddingX = 20;
+            const paddingY = 12;
+            const w = Math.ceil(textObj.width) + paddingX * 2;
+            const h = Math.ceil(textObj.height) + paddingY * 2;
+            const bg = this.add.graphics();
+            // Fill
+            bg.fillStyle(color, 1);
+            bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
+            // Border: high-contrast white for visibility
+            bg.lineStyle(4, 0xffffff, 0.95);
+            bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
+            bg.x = textObj.x;
+            bg.y = textObj.y;
+            // Ensure crisp placement
+            bg.setPosition(Math.round(bg.x), Math.round(bg.y));
+            textObj.setPosition(Math.round(textObj.x), Math.round(textObj.y));
+            return bg;
+        };
 
-        // Button entrance animations
-        startBtn.setAlpha(0).setY(height / 2 + 50);
-        startBtnBg.setAlpha(0).setY(height / 2 + 50);
-        optionsBtn.setAlpha(0).setY(height / 2 + 110);
-        optionsBtnBg.setAlpha(0).setY(height / 2 + 110);
+        const startBg = drawButton(startText, 0x2E7D32);   // solid green
+        const optionsBg = drawButton(optionsText, 0x546E7A); // solid blue-gray
 
-        this.tweens.add({
-            targets: [startBtn, startBtnBg],
-            alpha: 1,
-            y: '-=30',
-            duration: 600,
-            delay: 800,
-            ease: 'Back.easeOut'
-        });
+        // Ensure backgrounds are behind text
+        startBg.setDepth((startText.depth || 0) - 1);
+        optionsBg.setDepth((optionsText.depth || 0) - 1);
 
-        this.tweens.add({
-            targets: [optionsBtn, optionsBtnBg],
-            alpha: 1,
-            y: '-=30',
-            duration: 600,
-            delay: 1000,
-            ease: 'Back.easeOut'
-        });
+        // Simple fade-in
+        [startText, optionsText, startBg, optionsBg].forEach(obj => obj.setAlpha(0));
+        this.tweens.add({ targets: [startBg, startText], alpha: 1, duration: 300, ease: 'Power1' });
+        this.tweens.add({ targets: [optionsBg, optionsText], alpha: 1, duration: 300, delay: 100, ease: 'Power1' });
 
-        // Button click handlers
-        startBtn.on('pointerup', () => {
+        // Click handlers
+        startText.on('pointerup', () => {
             this.playButtonSound();
-            this.cameras.main.fade(300, 0, 0, 0);
-            this.time.delayedCall(300, () => {
-                this.scene.start('NumbersGameScene');
-            });
+            this.cameras.main.fade(200, 0, 0, 0);
+            this.time.delayedCall(200, () => this.scene.start('NumbersGameScene'));
         });
-
-        optionsBtn.on('pointerup', () => {
+        optionsText.on('pointerup', () => {
             this.playButtonSound();
-            this.cameras.main.fade(300, 0, 0, 0);
-            this.time.delayedCall(300, () => {
-                this.scene.start('OptionsScene');
-            });
+            this.cameras.main.fade(200, 0, 0, 0);
+            this.time.delayedCall(200, () => this.scene.start('OptionsScene'));
         });
     }
 
     setupButtonEffects(button, background, hoverColor) {
-        button.on('pointerover', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 1.1,
-                scaleY: 1.1,
-                duration: 200,
-                ease: 'Power2.easeOut'
-            });
-            
-            background.clear();
-            background.fillGradientStyle(hoverColor, hoverColor, hoverColor - 0x222222, hoverColor - 0x222222, 1);
-            if (button.text.includes('START')) {
-                background.fillRoundedRect(-80, -20, 160, 40, 20);
-            } else {
-                background.fillRoundedRect(-60, -18, 120, 36, 18);
-            }
-
-            // Subtle animated shine sweep on hover
-            const isStart = button.text.includes('START');
-            const btnWidth = isStart ? 160 : 120;
-            const btnHeight = isStart ? 40 : 36;
-
-            // Create a slender white rectangle with additive blend as the shine
-            const shine = this.add.rectangle(background.x - btnWidth / 2 - 30, background.y, 40, btnHeight + 10, 0xffffff)
-                .setAngle(20)
-                .setAlpha(0.0)
-                .setBlendMode(Phaser.BlendModes.ADD);
-
-            this.tweens.add({
-                targets: shine,
-                x: background.x + btnWidth / 2 + 30,
-                alpha: { from: 0.0, to: 0.35 },
-                duration: 450,
-                ease: 'Cubic.easeOut',
-                onComplete: () => {
-                    this.tweens.add({
-                        targets: shine,
-                        alpha: 0,
-                        duration: 150,
-                        onComplete: () => shine.destroy()
-                    });
-                }
-            });
-        });
-
-        button.on('pointerout', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 1,
-                scaleY: 1,
-                duration: 200,
-                ease: 'Power2.easeOut'
-            });
-            
-            background.clear();
-            const originalColor = button.text.includes('START') ? 0x4CAF50 : 0x2196F3;
-            const darkColor = button.text.includes('START') ? 0x2E7D32 : 0x1565C0;
-            background.fillGradientStyle(originalColor, originalColor, darkColor, darkColor, 1);
-            if (button.text.includes('START')) {
-                background.fillRoundedRect(-80, -20, 160, 40, 20);
-            } else {
-                background.fillRoundedRect(-60, -18, 120, 36, 18);
-            }
-        });
-
-        button.on('pointerdown', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 0.95,
-                scaleY: 0.95,
-                duration: 100,
-                ease: 'Power2.easeOut',
-                yoyo: true
-            });
-        });
+        // No-op: hover/press effects intentionally removed for clean UI
     }
 
     createParticleEffects() {
@@ -505,6 +365,13 @@ class OptionsScene extends Phaser.Scene {
     }
     
     createOptionsControls(width, height) {
+        // Local helper to compute a slightly darker color for borders
+        const darker = (c) => {
+            const r = Math.max(0, ((c >> 16) & 0xff) - 30);
+            const g = Math.max(0, ((c >> 8) & 0xff) - 30);
+            const b = Math.max(0, (c & 0xff) - 30);
+            return (r << 16) | (g << 8) | b;
+        };
         // Audio toggle
         const audioKey = 'numbersGameAudio';
         const isAudioOn = (localStorage.getItem(audioKey) ?? '1') !== '0';
@@ -512,9 +379,10 @@ class OptionsScene extends Phaser.Scene {
         // Audio button background
         const audioBtnBg = this.add.graphics();
         const audioColor = isAudioOn ? 0x4CAF50 : 0xF44336;
-        const audioDarkColor = isAudioOn ? 0x2E7D32 : 0xC62828;
-        audioBtnBg.fillGradientStyle(audioColor, audioColor, audioDarkColor, audioDarkColor, 1);
+        audioBtnBg.fillStyle(audioColor, 1);
         audioBtnBg.fillRoundedRect(-100, -20, 200, 40, 20);
+        audioBtnBg.lineStyle(4, 0xffffff, 0.95);
+        audioBtnBg.strokeRoundedRect(-100, -20, 200, 40, 20);
         audioBtnBg.x = width / 2;
         audioBtnBg.y = height / 2 - 20;
 
@@ -527,8 +395,10 @@ class OptionsScene extends Phaser.Scene {
 
         // Back button background
         const backBtnBg = this.add.graphics();
-        backBtnBg.fillGradientStyle(0x607D8B, 0x607D8B, 0x37474F, 0x37474F, 1);
+        backBtnBg.fillStyle(0x607D8B, 1);
         backBtnBg.fillRoundedRect(-60, -18, 120, 36, 18);
+        backBtnBg.lineStyle(4, 0xffffff, 0.95);
+        backBtnBg.strokeRoundedRect(-60, -18, 120, 36, 18);
         backBtnBg.x = width / 2;
         backBtnBg.y = height / 2 + 60;
 
@@ -579,9 +449,10 @@ class OptionsScene extends Phaser.Scene {
             // Update button color
             audioBtnBg.clear();
             const newAudioColor = newIsAudioOn ? 0x4CAF50 : 0xF44336;
-            const newAudioDarkColor = newIsAudioOn ? 0x2E7D32 : 0xC62828;
-            audioBtnBg.fillGradientStyle(newAudioColor, newAudioColor, newAudioDarkColor, newAudioDarkColor, 1);
+            audioBtnBg.fillStyle(newAudioColor, 1);
             audioBtnBg.fillRoundedRect(-100, -20, 200, 40, 20);
+            audioBtnBg.lineStyle(4, 0xffffff, 0.95);
+            audioBtnBg.strokeRoundedRect(-100, -20, 200, 40, 20);
         });
 
         backBtn.on('pointerup', () => {
@@ -594,63 +465,7 @@ class OptionsScene extends Phaser.Scene {
     }
     
     setupButtonEffects(button, background, hoverColor, isAudioButton) {
-        button.on('pointerover', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 1.05,
-                scaleY: 1.05,
-                duration: 200,
-                ease: 'Power2.easeOut'
-            });
-            
-            background.clear();
-            background.fillGradientStyle(hoverColor, hoverColor, hoverColor - 0x222222, hoverColor - 0x222222, 1);
-            if (isAudioButton) {
-                background.fillRoundedRect(-100, -20, 200, 40, 20);
-            } else {
-                background.fillRoundedRect(-60, -18, 120, 36, 18);
-            }
-        });
-
-        button.on('pointerout', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 1,
-                scaleY: 1,
-                duration: 200,
-                ease: 'Power2.easeOut'
-            });
-            
-            background.clear();
-            let originalColor, darkColor;
-            if (isAudioButton) {
-                const isAudioOn = button.text.includes('ON');
-                originalColor = isAudioOn ? 0x4CAF50 : 0xF44336;
-                darkColor = isAudioOn ? 0x2E7D32 : 0xC62828;
-                background.fillRoundedRect(-100, -20, 200, 40, 20);
-            } else {
-                originalColor = 0x607D8B;
-                darkColor = 0x37474F;
-                background.fillRoundedRect(-60, -18, 120, 36, 18);
-            }
-            background.fillGradientStyle(originalColor, originalColor, darkColor, darkColor, 1);
-            if (isAudioButton) {
-                background.fillRoundedRect(-100, -20, 200, 40, 20);
-            } else {
-                background.fillRoundedRect(-60, -18, 120, 36, 18);
-            }
-        });
-
-        button.on('pointerdown', () => {
-            this.tweens.add({
-                targets: [button, background],
-                scaleX: 0.95,
-                scaleY: 0.95,
-                duration: 100,
-                ease: 'Power2.easeOut',
-                yoyo: true
-            });
-        });
+        // No-op on options scene as well
     }
     
     createParticleEffects() {

@@ -126,8 +126,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
     <!-- Legacy game logic (NumbersGameScene, OptionsScene). Auto-bootstrap is guarded. -->
-    <script src="game.js"></script>
-    <!-- New modular bootstrap and MainMenuScene -->
-    <script type="module" src="./src/main.js"></script>
+    <!-- Use legacy bootstrap (game.js). Added cache-busting query to avoid stale caching when serving. -->
+    <script src="game.js?v=2"></script>
+    <!-- Disabled module bootstrap to prevent overriding game.js while polishing UI -->
+    <!-- <script type="module" src="./src/main.js"></script> -->
 </body>
 </html>
