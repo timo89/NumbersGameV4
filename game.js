@@ -1003,7 +1003,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     toggleFlipMode() {
         this.isFlipMode = !this.isFlipMode;
-        this.flipBtn.textContent = this.isFlipMode ? '🎯' : '🔄';
+        this.flipBtn.textContent = this.isFlipMode ? '🎯' : '±';
         this.flipBtn.classList.toggle('active', this.isFlipMode);
 
         if (this.isFlipMode) {
@@ -1024,7 +1024,7 @@ class NumbersGameScene extends Phaser.Scene {
 
         // Reset UI
         this.pauseBtn.textContent = '⏸️';
-        this.flipBtn.textContent = '🔄';
+        this.flipBtn.textContent = '±';
         this.flipBtn.classList.remove('active');
 
         // Stop timer
