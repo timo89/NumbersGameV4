@@ -985,6 +985,11 @@ class NumbersGameScene extends Phaser.Scene {
         this.tileSprites[row][col].text.setText(newValue.toString());
         this.tileSprites[row][col].bg.setFillStyle(this.getTileColor(newValue));
         this.tileSprites[row][col].text.setColor(this.getContrastTextColorString(newValue));
+
+        // Auto-disable flip mode after single use
+        this.isFlipMode = false;
+        this.flipBtn.classList.remove('active');
+        this.flipBtn.textContent = '±';
     }
 
     togglePause() {
@@ -1003,7 +1008,7 @@ class NumbersGameScene extends Phaser.Scene {
 
     toggleFlipMode() {
         this.isFlipMode = !this.isFlipMode;
-        this.flipBtn.textContent = this.isFlipMode ? '🎯' : '±';
+        this.flipBtn.textContent = '±';
         this.flipBtn.classList.toggle('active', this.isFlipMode);
 
         if (this.isFlipMode) {
