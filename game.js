@@ -438,6 +438,24 @@ class NumbersGameScene extends Phaser.Scene {
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
             this.updateTileDisplay();
+        } else {
+            // Try to bridge a shortest valid path from the last tile to the hovered tile
+            if (this.selectedPath.length > 0 && !this.isSelected(tile.row, tile.col)) {
+                const last = this.selectedPath[this.selectedPath.length - 1];
+                const bridge = this.findShortestOrthogonalPath(last.row, last.col, tile.row, tile.col);
+                if (bridge && bridge.length > 0) {
+                    for (let i = 0; i < bridge.length; i++) {
+                        const step = bridge[i];
+                        // Safety check: ensure still valid as we add
+                        if (this.canAddToPath(step.row, step.col)) {
+                            this.addToPath(step.row, step.col);
+                        } else {
+                            break;
+                        }
+                    }
+                    this.updateTileDisplay();
+                }
+            }
         }
     }
 
@@ -495,6 +513,23 @@ class NumbersGameScene extends Phaser.Scene {
         if (this.canAddToPath(tile.row, tile.col)) {
             this.addToPath(tile.row, tile.col);
             this.updateTileDisplay();
+        } else {
+            // Try to bridge a shortest valid path from the last tile to the hovered tile
+            if (this.selectedPath.length > 0 && !this.isSelected(tile.row, tile.col)) {
+                const last = this.selectedPath[this.selectedPath.length - 1];
+                const bridge = this.findShortestOrthogonalPath(last.row, last.col, tile.row, tile.col);
+                if (bridge && bridge.length > 0) {
+                    for (let i = 0; i < bridge.length; i++) {
+                        const step = bridge[i];
+                        if (this.canAddToPath(step.row, step.col)) {
+                            this.addToPath(step.row, step.col);
+                        } else {
+                            break;
+                        }
+                    }
+                    this.updateTileDisplay();
+                }
+            }
         }
         e.preventDefault();
     }
@@ -563,6 +598,75 @@ class NumbersGameScene extends Phaser.Scene {
 
         // Only orthogonally adjacent (not diagonal)
         return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+    }
+
+    /**
+     * Find the shortest valid orthogonal path between two tiles, avoiding null tiles and already traversed tiles.
+     * Returns an array of coordinates representing the steps to take EXCLUDING the starting tile and INCLUDING the end tile.
+     */
+    findShortestOrthogonalPath(startRow, startCol, endRow, endCol) {
+        if (startRow === endRow && startCol === endCol) return [];
+
+        // Build a fast lookup set for already selected tiles (cannot traverse)
+        const blocked = new Set(this.selectedPath.map(t => `${t.row},${t.col}`));
+        // Allow starting tile even if it's in selectedPath
+        blocked.delete(`${startRow},${startCol}`);
+
+        const inBounds = (r, c) => r >= 0 && r < this.GRID_SIZE && c >= 0 && c < this.GRID_SIZE;
+        const passable = (r, c) => this.grid[r][c] !== null && !blocked.has(`${r},${c}`);
+
+        // Early exit if destination itself is invalid or already selected
+        if (!inBounds(endRow, endCol) || !passable(endRow, endCol)) return null;
+
+        const dirs = [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+        ];
+
+        const visited = Array.from({ length: this.GRID_SIZE }, () => Array(this.GRID_SIZE).fill(false));
+        const prev = Array.from({ length: this.GRID_SIZE }, () => Array(this.GRID_SIZE).fill(null));
+        const queue = [];
+
+        queue.push([startRow, startCol]);
+        visited[startRow][startCol] = true;
+
+        while (queue.length > 0) {
+            const [r, c] = queue.shift();
+            if (r === endRow && c === endCol) break;
+
+            for (let i = 0; i < dirs.length; i++) {
+                const nr = r + dirs[i][0];
+                const nc = c + dirs[i][1];
+                if (!inBounds(nr, nc)) continue;
+                if (visited[nr][nc]) continue;
+                if (!passable(nr, nc)) continue;
+
+                visited[nr][nc] = true;
+                prev[nr][nc] = [r, c];
+                queue.push([nr, nc]);
+            }
+        }
+
+        if (!visited[endRow][endCol]) return null; // No path
+
+        // Reconstruct path from end to start
+        const path = [];
+        let cur = [endRow, endCol];
+        while (cur) {
+            path.push({ row: cur[0], col: cur[1] });
+            const p = prev[cur[0]][cur[1]];
+            if (!p) break;
+            cur = p;
+        }
+        path.reverse();
+
+        // Remove the starting tile; we only want steps after the current last tile
+        if (path.length > 0 && path[0].row === startRow && path[0].col === startCol) {
+            path.shift();
+        }
+        return path;
     }
 
     addToPath(row, col) {
