@@ -766,26 +766,42 @@ class NumbersGameScene extends Phaser.Scene {
         const boardRight = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
         const boardBottom = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
 
+        // Compute center and half-dimensions
+        const centerX = (boardLeft + boardRight) / 2;
+        const centerY = (boardTop + boardBottom) / 2;
+        const halfWidth = (boardRight - boardLeft) / 2;
+        const halfHeight = (boardBottom - boardTop) / 2;
+
+        // Position graphics at the board center so scaling grows outward from center
+        this.mistakeGraphics.setPosition(centerX, centerY);
+
+        // Relative board edges (with origin at center)
+        const leftRel = -halfWidth;
+        const rightRel = halfWidth;
+        const topRel = -halfHeight;
+        const bottomRel = halfHeight;
+
         // Set up red color with transparency
         this.mistakeGraphics.lineStyle(4, 0xFF0000, 0.8); // Red, semi-transparent
 
-        // Draw diagonal zig-zag lines from top-left to bottom-right
+        // Draw diagonal zig-zag lines from top-left to bottom-right (relative coords)
         const zigzagSpacing = 40; // Distance between zig-zag lines
         const zigzagAmplitude = 20; // Height of zig-zag peaks
         const zigzagFrequency = 30; // Distance between peaks
 
-        // Draw multiple diagonal zig-zag lines
-        for (let offset = -boardRight; offset < boardRight + boardBottom; offset += zigzagSpacing) {
+        // Range across the full extents diagonally
+        const diagonalExtent = halfWidth + halfHeight;
+        for (let offset = -diagonalExtent; offset < diagonalExtent; offset += zigzagSpacing) {
             this.mistakeGraphics.beginPath();
 
-            let startX = boardLeft + offset;
-            let startY = boardTop;
+            let startX = leftRel + offset;
+            let startY = topRel;
 
             // Adjust start position if line starts outside board
-            if (startX < boardLeft) {
-                const yOffset = (boardLeft - startX);
-                startX = boardLeft;
-                startY = boardTop + yOffset;
+            if (startX < leftRel) {
+                const yOffset = (leftRel - startX);
+                startX = leftRel;
+                startY = topRel + yOffset;
             }
 
             // Draw zig-zag line
@@ -795,9 +811,9 @@ class NumbersGameScene extends Phaser.Scene {
 
             this.mistakeGraphics.moveTo(currentX, currentY);
 
-            while (currentX < boardRight && currentY < boardBottom) {
-                const nextX = Math.min(currentX + zigzagFrequency, boardRight);
-                const nextY = Math.min(currentY + zigzagFrequency, boardBottom);
+            while (currentX < rightRel && currentY < bottomRel) {
+                const nextX = Math.min(currentX + zigzagFrequency, rightRel);
+                const nextY = Math.min(currentY + zigzagFrequency, bottomRel);
 
                 // Add zig-zag pattern
                 const midX = currentX + (nextX - currentX) / 2;
@@ -821,24 +837,24 @@ class NumbersGameScene extends Phaser.Scene {
             this.mistakeGraphics.strokePath();
         }
 
-        // Draw additional visual effects - red X pattern in corners
+        // Draw additional visual effects - red X pattern in corners (relative coords)
         this.mistakeGraphics.lineStyle(6, 0xFF4444, 0.6);
 
         // Top-left to bottom-right X
         this.mistakeGraphics.beginPath();
-        this.mistakeGraphics.moveTo(boardLeft + 10, boardTop + 10);
-        this.mistakeGraphics.lineTo(boardRight - 10, boardBottom - 10);
+        this.mistakeGraphics.moveTo(leftRel + 10, topRel + 10);
+        this.mistakeGraphics.lineTo(rightRel - 10, bottomRel - 10);
         this.mistakeGraphics.strokePath();
 
         // Top-right to bottom-left X
         this.mistakeGraphics.beginPath();
-        this.mistakeGraphics.moveTo(boardRight - 10, boardTop + 10);
-        this.mistakeGraphics.lineTo(boardLeft + 10, boardBottom - 10);
+        this.mistakeGraphics.moveTo(rightRel - 10, topRel + 10);
+        this.mistakeGraphics.lineTo(leftRel + 10, bottomRel - 10);
         this.mistakeGraphics.strokePath();
 
-        // Add red border around the entire board
+        // Add red border around the entire board (relative coords)
         this.mistakeGraphics.lineStyle(3, 0xFF0000, 0.7);
-        this.mistakeGraphics.strokeRect(boardLeft, boardTop, boardRight - boardLeft, boardBottom - boardTop);
+        this.mistakeGraphics.strokeRect(leftRel, topRel, halfWidth * 2, halfHeight * 2);
     }
 
     /**
@@ -851,9 +867,9 @@ class NumbersGameScene extends Phaser.Scene {
         // Draw the mistake effect
         this.drawMistakeEffect();
 
-        // Start with invisible and scale up
+        // Start from center with zero scale so it grows outward
         this.mistakeGraphics.setAlpha(0);
-        this.mistakeGraphics.setScale(0.8);
+        this.mistakeGraphics.setScale(0);
 
         // Animate in
         this.tweens.add({
