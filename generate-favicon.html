@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Favicon</title>
+</head>
+<body>
+    <h1>Numbers Game Favicon Generator</h1>
+    <p>Click the button below to generate and download the favicon:</p>
+    <button onclick="generateFavicon()">Generate Favicon</button>
+    <br><br>
+    <canvas id="faviconCanvas" width="32" height="32" style="border: 1px solid #ccc;"></canvas>
+    
+    <script>
+        function generateFavicon() {
+            const canvas = document.getElementById('faviconCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, 32, 32);
+            
+            // Set background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 32, 32);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#d0d0d0';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            
+            // Horizontal lines
+            ctx.moveTo(8, 8);
+            ctx.lineTo(24, 8);
+            ctx.moveTo(8, 16);
+            ctx.lineTo(24, 16);
+            ctx.moveTo(8, 24);
+            ctx.lineTo(24, 24);
+            
+            // Vertical lines
+            ctx.moveTo(8, 8);
+            ctx.lineTo(8, 24);
+            ctx.moveTo(16, 8);
+            ctx.lineTo(16, 24);
+            ctx.moveTo(24, 8);
+            ctx.lineTo(24, 24);
+            ctx.stroke();
+            
+            // Draw numbers
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 6px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            ctx.fillText('3', 10, 13);
+            ctx.fillText('7', 18, 13);
+            ctx.fillText('2', 10, 21);
+            
+            // Highlight number 5 in orange
+            ctx.fillStyle = '#ff9800';
+            ctx.fillText('5', 18, 21);
+            
+            // Draw highlight rectangle
+            ctx.strokeStyle = '#ff9800';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(16.5, 16.5, 7, 7);
+            
+            // Download the favicon
+            const link = document.createElement('a');
+            link.download = 'favicon.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Generate preview on load
+        window.onload = function() {
+            generateFavicon();
+        };
+    </script>
+</body>
+</html>
