@@ -753,7 +753,7 @@ class NumbersGameScene extends Phaser.Scene {
     }
 
     /**
-     * Draw red zig-zag lines across the board to indicate a mistake
+     * Draw modern error effect with pulsing warning symbols and animated borders
      */
     drawMistakeEffect() {
         if (!this.mistakeGraphics) return;
@@ -765,84 +765,91 @@ class NumbersGameScene extends Phaser.Scene {
         const boardTop = this.CANVAS_PADDING;
         const boardRight = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
         const boardBottom = this.CANVAS_PADDING + (this.GRID_SIZE * this.CELL_SIZE);
+        const boardWidth = boardRight - boardLeft;
+        const boardHeight = boardBottom - boardTop;
 
-        // Set up red color with transparency
-        this.mistakeGraphics.lineStyle(4, 0xFF0000, 0.8); // Red, semi-transparent
-
-        // Draw diagonal zig-zag lines from top-left to bottom-right
-        const zigzagSpacing = 40; // Distance between zig-zag lines
-        const zigzagAmplitude = 20; // Height of zig-zag peaks
-        const zigzagFrequency = 30; // Distance between peaks
-
-        // Draw multiple diagonal zig-zag lines
-        for (let offset = -boardRight; offset < boardRight + boardBottom; offset += zigzagSpacing) {
-            this.mistakeGraphics.beginPath();
-
-            let startX = boardLeft + offset;
-            let startY = boardTop;
-
-            // Adjust start position if line starts outside board
-            if (startX < boardLeft) {
-                const yOffset = (boardLeft - startX);
-                startX = boardLeft;
-                startY = boardTop + yOffset;
-            }
-
-            // Draw zig-zag line
-            let currentX = startX;
-            let currentY = startY;
-            let zigzagUp = true;
-
-            this.mistakeGraphics.moveTo(currentX, currentY);
-
-            while (currentX < boardRight && currentY < boardBottom) {
-                const nextX = Math.min(currentX + zigzagFrequency, boardRight);
-                const nextY = Math.min(currentY + zigzagFrequency, boardBottom);
-
-                // Add zig-zag pattern
-                const midX = currentX + (nextX - currentX) / 2;
-                const midY = currentY + (nextY - currentY) / 2;
-                const zigzagOffset = zigzagUp ? -zigzagAmplitude : zigzagAmplitude;
-
-                // Calculate perpendicular offset for zig-zag
-                const angle = Math.atan2(nextY - currentY, nextX - currentX);
-                const perpAngle = angle + Math.PI / 2;
-                const zigzagX = midX + Math.cos(perpAngle) * zigzagOffset;
-                const zigzagY = midY + Math.sin(perpAngle) * zigzagOffset;
-
-                this.mistakeGraphics.lineTo(zigzagX, zigzagY);
-                this.mistakeGraphics.lineTo(nextX, nextY);
-
-                currentX = nextX;
-                currentY = nextY;
-                zigzagUp = !zigzagUp;
-            }
-
-            this.mistakeGraphics.strokePath();
+        // Draw pulsing warning border with gradient effect
+        const borderThickness = 4;
+        const gradientSteps = 8;
+        
+        for (let i = 0; i < gradientSteps; i++) {
+            const alpha = 0.3 - (i * 0.03); // Decreasing alpha for gradient effect
+            const thickness = borderThickness + i * 2; // Increasing thickness for gradient
+            
+            this.mistakeGraphics.lineStyle(thickness, 0xFF6B6B, alpha);
+            this.mistakeGraphics.strokeRect(
+                boardLeft - thickness/2, 
+                boardTop - thickness/2, 
+                boardWidth + thickness, 
+                boardHeight + thickness
+            );
         }
 
-        // Draw additional visual effects - red X pattern in corners
-        this.mistakeGraphics.lineStyle(6, 0xFF4444, 0.6);
+        // Draw warning triangles in corners
+        const triangleSize = 15;
+        const cornerOffset = 8;
+        
+        // Top-left warning triangle
+        this.mistakeGraphics.fillStyle(0xFF6B6B, 0.8);
+        this.mistakeGraphics.fillTriangle(
+            boardLeft + cornerOffset, boardTop + cornerOffset + triangleSize,
+            boardLeft + cornerOffset + triangleSize, boardTop + cornerOffset,
+            boardLeft + cornerOffset + triangleSize/2, boardTop + cornerOffset + triangleSize
+        );
+        
+        // Top-right warning triangle
+        this.mistakeGraphics.fillTriangle(
+            boardRight - cornerOffset - triangleSize, boardTop + cornerOffset + triangleSize,
+            boardRight - cornerOffset, boardTop + cornerOffset,
+            boardRight - cornerOffset - triangleSize/2, boardTop + cornerOffset + triangleSize
+        );
+        
+        // Bottom-left warning triangle
+        this.mistakeGraphics.fillTriangle(
+            boardLeft + cornerOffset, boardBottom - cornerOffset - triangleSize,
+            boardLeft + cornerOffset + triangleSize, boardBottom - cornerOffset,
+            boardLeft + cornerOffset + triangleSize/2, boardBottom - cornerOffset - triangleSize
+        );
+        
+        // Bottom-right warning triangle
+        this.mistakeGraphics.fillTriangle(
+            boardRight - cornerOffset - triangleSize, boardBottom - cornerOffset - triangleSize,
+            boardRight - cornerOffset, boardBottom - cornerOffset,
+            boardRight - cornerOffset - triangleSize/2, boardBottom - cornerOffset - triangleSize
+        );
 
-        // Top-left to bottom-right X
+        // Draw animated ripple effect from center
+        const centerX = boardLeft + boardWidth / 2;
+        const centerY = boardTop + boardHeight / 2;
+        const maxRadius = Math.max(boardWidth, boardHeight) / 2;
+        
+        for (let i = 0; i < 3; i++) {
+            const radius = (maxRadius * 0.3) + (i * maxRadius * 0.2);
+            const alpha = 0.4 - (i * 0.1);
+            
+            this.mistakeGraphics.lineStyle(2, 0xFF6B6B, alpha);
+            this.mistakeGraphics.strokeCircle(centerX, centerY, radius);
+        }
+
+        // Draw subtle cross pattern in center
+        this.mistakeGraphics.lineStyle(3, 0xFF6B6B, 0.5);
+        const crossSize = 20;
+        
+        // Vertical line
         this.mistakeGraphics.beginPath();
-        this.mistakeGraphics.moveTo(boardLeft + 10, boardTop + 10);
-        this.mistakeGraphics.lineTo(boardRight - 10, boardBottom - 10);
+        this.mistakeGraphics.moveTo(centerX, centerY - crossSize);
+        this.mistakeGraphics.lineTo(centerX, centerY + crossSize);
         this.mistakeGraphics.strokePath();
-
-        // Top-right to bottom-left X
+        
+        // Horizontal line
         this.mistakeGraphics.beginPath();
-        this.mistakeGraphics.moveTo(boardRight - 10, boardTop + 10);
-        this.mistakeGraphics.lineTo(boardLeft + 10, boardBottom - 10);
+        this.mistakeGraphics.moveTo(centerX - crossSize, centerY);
+        this.mistakeGraphics.lineTo(centerX + crossSize, centerY);
         this.mistakeGraphics.strokePath();
-
-        // Add red border around the entire board
-        this.mistakeGraphics.lineStyle(3, 0xFF0000, 0.7);
-        this.mistakeGraphics.strokeRect(boardLeft, boardTop, boardRight - boardLeft, boardBottom - boardTop);
     }
 
     /**
-     * Show mistake effect with animation
+     * Show mistake effect with enhanced animation
      */
     showMistakeEffect() {
         // Set flag to block user interactions during mistake effect
@@ -855,28 +862,51 @@ class NumbersGameScene extends Phaser.Scene {
         this.mistakeGraphics.setAlpha(0);
         this.mistakeGraphics.setScale(0.8);
 
-        // Animate in
+        // Create a more dynamic animation sequence
         this.tweens.add({
             targets: this.mistakeGraphics,
             alpha: 1,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 200,
+            scaleX: 1.1, // Slightly overshoot for bounce effect
+            scaleY: 1.1,
+            duration: 300,
             ease: 'Back.easeOut',
             onComplete: () => {
-                // Hold for a moment, then fade out
-                this.time.delayedCall(1000, () => {
-                    this.tweens.add({
-                        targets: this.mistakeGraphics,
-                        alpha: 0,
-                        duration: 500,
-                        ease: 'Power2.easeOut',
-                        onComplete: () => {
-                            this.mistakeGraphics.clear();
-                            // Clear flag to re-enable user interactions
-                            this.isShowingMistakeEffect = false;
-                        }
-                    });
+                // Bounce back to normal size
+                this.tweens.add({
+                    targets: this.mistakeGraphics,
+                    scaleX: 1,
+                    scaleY: 1,
+                    duration: 150,
+                    ease: 'Power2.easeOut',
+                    onComplete: () => {
+                        // Add subtle pulsing effect while visible
+                        this.tweens.add({
+                            targets: this.mistakeGraphics,
+                            scaleX: 1.02,
+                            scaleY: 1.02,
+                            duration: 800,
+                            yoyo: true,
+                            repeat: 1,
+                            ease: 'Sine.easeInOut'
+                        });
+                        
+                        // Hold for a moment, then fade out
+                        this.time.delayedCall(1200, () => {
+                            this.tweens.add({
+                                targets: this.mistakeGraphics,
+                                alpha: 0,
+                                scaleX: 0.9,
+                                scaleY: 0.9,
+                                duration: 400,
+                                ease: 'Power2.easeOut',
+                                onComplete: () => {
+                                    this.mistakeGraphics.clear();
+                                    // Clear flag to re-enable user interactions
+                                    this.isShowingMistakeEffect = false;
+                                }
+                            });
+                        });
+                    }
                 });
             }
         });
