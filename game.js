@@ -782,7 +782,7 @@ class NumbersGameScene extends Phaser.Scene {
         const bottomRel = halfHeight;
 
         // Set up red color with transparency
-        this.mistakeGraphics.lineStyle(4, 0xFF0000, 0.8); // Red, semi-transparent
+        this.mistakeGraphics.lineStyle(4, 0xFF9800, 0.8); // Orange, semi-transparent
 
         // Draw diagonal zig-zag lines from top-left to bottom-right (relative coords)
         const zigzagSpacing = 40; // Distance between zig-zag lines
@@ -838,7 +838,7 @@ class NumbersGameScene extends Phaser.Scene {
         }
 
         // Draw additional visual effects - red X pattern in corners (relative coords)
-        this.mistakeGraphics.lineStyle(6, 0xFF4444, 0.6);
+        this.mistakeGraphics.lineStyle(6, 0xFFA726, 0.6);
 
         // Top-left to bottom-right X
         this.mistakeGraphics.beginPath();
@@ -853,7 +853,7 @@ class NumbersGameScene extends Phaser.Scene {
         this.mistakeGraphics.strokePath();
 
         // Add red border around the entire board (relative coords)
-        this.mistakeGraphics.lineStyle(3, 0xFF0000, 0.7);
+        this.mistakeGraphics.lineStyle(3, 0xFB8C00, 0.7);
         this.mistakeGraphics.strokeRect(leftRel, topRel, halfWidth * 2, halfHeight * 2);
     }
 
