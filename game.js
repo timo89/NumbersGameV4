@@ -34,159 +34,152 @@ class MainMenuScene extends Phaser.Scene {
 
     createAnimatedBackground() {
         const { width, height } = this.scale;
-
-        // Simple subtle background (minor gradient, no edge borders)
+        // Dark blue background with subtle vertical gradient (darker at bottom)
         const bg = this.add.graphics();
-        bg.fillGradientStyle(0x182233, 0x1b263b, 0x1b263b, 0x182233, 1);
+        bg.fillGradientStyle(0x001f3f, 0x001f3f, 0x000b1a, 0x000b1a, 1);
         bg.fillRect(0, 0, width, height);
 
-        // Floating numbers: multiples of 5, both positive and negative
+        // Floating numbers: multiples of 5, mix positive (green) and negative (red)
         const values = [];
         for (let v = 5; v <= 50; v += 5) { values.push(v, -v); }
 
         const makeNumber = (fontSize, alpha, drift, durMin, durMax) => {
-            const val = values[Phaser.Math.Between(0, values.length - 1)].toString();
+            const raw = values[Phaser.Math.Between(0, values.length - 1)];
+            const val = raw.toString();
+            const color = raw >= 0 ? '#00ff00' : '#ff0000';
+            // Compute exclusion band around title/subtitle/buttons
+            const titleY = Math.round(height / 3);
+            const buttonsBaseY = titleY + 60 + 100;
+            const excludeTop = titleY - 60;
+            const excludeBottom = buttonsBaseY + 60;
+
+            let rx = Phaser.Math.Between(20, width - 20);
+            let ry = Phaser.Math.Between(20, height - 20);
+            let attempts = 0;
+            while (ry >= excludeTop && ry <= excludeBottom && attempts < 10) {
+                ry = Phaser.Math.Between(20, height - 20);
+                attempts++;
+            }
+
             const n = this.add.text(
-                Phaser.Math.Between(0, width),
-                Phaser.Math.Between(0, height),
+                rx,
+                ry,
                 val,
-                { fontFamily: 'Poppins, Arial, sans-serif', fontSize: `${fontSize}px`, color: '#ffffff' }
+                { fontFamily: 'Arial, Helvetica, sans-serif', fontSize: `${fontSize}px`, color }
             ).setAlpha(alpha).setOrigin(0.5);
             if (n.setResolution) n.setResolution(2);
+            n.setShadow(0, 2, '#000000', 6, false, true);
             n.setPosition(Math.round(n.x), Math.round(n.y));
+
             this.tweens.add({
                 targets: n,
                 y: n.y - drift,
-                alpha: alpha + 0.1,
+                angle: { from: -2, to: 2 },
+                alpha: { from: alpha * 0.9, to: Math.min(1, alpha + 0.15) },
                 duration: Phaser.Math.Between(durMin, durMax),
                 ease: 'Sine.easeInOut',
                 yoyo: true,
                 repeat: -1,
-                delay: Phaser.Math.Between(0, 1500)
+                delay: Phaser.Math.Between(0, 1200)
             });
         };
 
-        for (let i = 0; i < 10; i++) makeNumber(22, 0.08, 60, 4000, 7000);
-        for (let i = 0; i < 8; i++) makeNumber(28, 0.12, 90, 3500, 6000);
+        // 12-15 numbers total for subtle motion
+        for (let i = 0; i < 8; i++) makeNumber(26, 0.10, 60, 4500, 7000);
+        for (let i = 0; i < 6; i++) makeNumber(32, 0.12, 80, 4000, 6500);
     }
 
     createTitle(width, height) {
-        // Main title with shadow effect
-        const titleShadow = this.add.text(width / 2 + 3, height / 2 - 77, 'NUMBERS GAME', {
-            fontFamily: 'Orbitron, Arial, sans-serif',
-            fontSize: '52px',
-            color: '#000000',
-            alpha: 0.3,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        if (titleShadow.setResolution) titleShadow.setResolution(2);
-        titleShadow.setPosition(Math.round(titleShadow.x), Math.round(titleShadow.y));
+        // Position near top-third
+        const titleY = Math.round(height / 3);
 
-        const title = this.add.text(width / 2, height / 2 - 80, 'NUMBERS GAME', {
-            fontFamily: 'Orbitron, Arial, sans-serif',
-            fontSize: '52px',
+        const title = this.add.text(width / 2, titleY, 'NUMBERS GAME', {
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: '80px',
             color: '#ffffff',
             fontStyle: 'bold',
-            stroke: '#ff6b35',
-            strokeThickness: 3
+            stroke: '#FFA500',
+            strokeThickness: 2
         }).setOrigin(0.5);
         if (title.setResolution) title.setResolution(2);
-        title.setPosition(Math.round(title.x), Math.round(title.y));
-
         title.setShadow(0, 6, '#000000', 12, false, true);
 
-        // Subtitle
-        const subtitle = this.add.text(width / 2, height / 2 - 35, 'Connect • Calculate • Conquer', {
-            fontFamily: 'Poppins, Arial, sans-serif',
-            fontSize: '18px',
-            color: '#ffd700',
-            alpha: 0.8
+        // Subtitle directly below the title
+        const subtitle = this.add.text(width / 2, titleY + 60 + 20, 'Connect • Calculate • Conquer', {
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: '30px',
+            color: '#FFD700'
         }).setOrigin(0.5);
         if (subtitle.setResolution) subtitle.setResolution(2);
-        subtitle.setPosition(Math.round(subtitle.x), Math.round(subtitle.y));
         subtitle.setShadow(0, 2, '#000000', 6, false, true);
 
-        // Animate title entrance
-        title.setScale(0);
+        // Entrance animations
+        title.setAlpha(0);
+        this.tweens.add({ targets: title, alpha: 1, duration: 1000, ease: 'Power2' });
+
+        const targetY = subtitle.y;
         subtitle.setAlpha(0);
-        
-        this.tweens.add({
-            targets: title,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 800,
-            ease: 'Back.easeOut'
-        });
+        subtitle.setY(targetY + 20);
+        this.tweens.add({ targets: subtitle, alpha: 1, y: targetY, duration: 800, delay: 300, ease: 'Power2' });
 
-        this.tweens.add({
-            targets: subtitle,
-            alpha: 0.8,
-            duration: 1000,
-            delay: 400,
-            ease: 'Power2.easeOut'
-        });
-
-        // Pulsing glow effect for title
-        this.tweens.add({
-            targets: title,
-            alpha: 0.8,
-            duration: 2000,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1
-        });
+        // Gentle pulsing for title
+        this.tweens.add({ targets: title, scale: 1.02, duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     }
 
     createMenuButtons(width, height) {
         const centerX = width / 2;
 
-        // Common text styles
-        const startText = this.add.text(centerX, height / 2 + 20, 'START GAME', {
-            fontFamily: 'Poppins, Arial, sans-serif',
+        // Base Y uses subtitle area: spaced below the title/subtitle stack
+        const baseY = Math.round(height / 3) + 60 + 100; // titleY + subtitle offset + padding
+
+        const startText = this.add.text(centerX, baseY, 'START GAME', {
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: '28px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        const optionsText = this.add.text(centerX, baseY + 50, 'OPTIONS', {
+            fontFamily: 'Arial, Helvetica, sans-serif',
             fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        const optionsText = this.add.text(centerX, height / 2 + 80, 'OPTIONS', {
-            fontFamily: 'Poppins, Arial, sans-serif',
-            fontSize: '20px',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        // Draw solid backgrounds sized to text with padding and a visible border
-        const drawButton = (textObj, color) => {
-            const paddingX = 20;
-            const paddingY = 12;
+        // Semi-transparent rounded rectangle backgrounds sized to text
+        const drawButton = (textObj) => {
+            const paddingX = 26;
+            const paddingY = 14;
             const w = Math.ceil(textObj.width) + paddingX * 2;
             const h = Math.ceil(textObj.height) + paddingY * 2;
             const bg = this.add.graphics();
-            // Fill
-            bg.fillStyle(color, 1);
-            bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
-            // Border: high-contrast white for visibility
-            bg.lineStyle(4, 0xffffff, 0.95);
-            bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
+            bg.fillStyle(0xffffff, 0.25);
+            bg.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+            bg.lineStyle(2, 0xffffff, 0.8);
+            bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
             bg.x = textObj.x;
             bg.y = textObj.y;
-            // Ensure crisp placement
             bg.setPosition(Math.round(bg.x), Math.round(bg.y));
             textObj.setPosition(Math.round(textObj.x), Math.round(textObj.y));
             return bg;
         };
 
-        const startBg = drawButton(startText, 0x2E7D32);   // solid green
-        const optionsBg = drawButton(optionsText, 0x546E7A); // solid blue-gray
+        const startBg = drawButton(startText);
+        const optionsBg = drawButton(optionsText);
 
-        // Ensure backgrounds are behind text
         startBg.setDepth((startText.depth || 0) - 1);
         optionsBg.setDepth((optionsText.depth || 0) - 1);
 
-        // Simple fade-in
+        // Entrance: fade-in
         [startText, optionsText, startBg, optionsBg].forEach(obj => obj.setAlpha(0));
-        this.tweens.add({ targets: [startBg, startText], alpha: 1, duration: 300, ease: 'Power1' });
-        this.tweens.add({ targets: [optionsBg, optionsText], alpha: 1, duration: 300, delay: 100, ease: 'Power1' });
+        this.tweens.add({ targets: [startBg, startText], alpha: 1, duration: 400, ease: 'Power1' });
+        this.tweens.add({ targets: [optionsBg, optionsText], alpha: 1, duration: 400, delay: 120, ease: 'Power1' });
+
+        // Hover effects
+        this.setupButtonEffects(startText, startBg, '#ffffff');
+        this.setupButtonEffects(optionsText, optionsBg, '#ffffff');
+
+        // Removed constant pulsing to keep motion calm; hover provides feedback
 
         // Click handlers
         startText.on('pointerup', () => {
@@ -202,7 +195,36 @@ class MainMenuScene extends Phaser.Scene {
     }
 
     setupButtonEffects(button, background, hoverColor) {
-        // No-op: hover/press effects intentionally removed for clean UI
+        const hoverIn = () => {
+            this.tweens.add({ targets: button, scale: 1.1, duration: 120, ease: 'Power2' });
+            background.clear();
+            // Brighten background slightly on hover
+            const paddingX = 26;
+            const paddingY = 14;
+            const w = Math.ceil(button.width) + paddingX * 2;
+            const h = Math.ceil(button.height) + paddingY * 2;
+            background.fillStyle(0xffffff, 0.38);
+            background.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+            background.lineStyle(2, 0xffffff, 1);
+            background.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+        };
+        const hoverOut = () => {
+            this.tweens.add({ targets: button, scale: 1.0, duration: 120, ease: 'Power2' });
+            background.clear();
+            const paddingX = 26;
+            const paddingY = 14;
+            const w = Math.ceil(button.width) + paddingX * 2;
+            const h = Math.ceil(button.height) + paddingY * 2;
+            background.fillStyle(0xffffff, 0.25);
+            background.fillRoundedRect(-w / 2, -h / 2, w, h, 18);
+            background.lineStyle(2, 0xffffff, 0.8);
+            background.strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+        };
+
+        button.on('pointerover', hoverIn);
+        button.on('pointerout', hoverOut);
+        button.on('pointerdown', () => this.tweens.add({ targets: button, scale: 0.96, duration: 80, ease: 'Power2' }));
+        button.on('pointerup', () => this.tweens.add({ targets: button, scale: 1.1, duration: 80, ease: 'Power2' }));
     }
 
     createParticleEffects() {
