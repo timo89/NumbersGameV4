@@ -675,6 +675,13 @@ class NumbersGameScene extends Phaser.Scene {
         // Hide path info when dragging ends
         this.pathInfoEl.classList.remove('dragging');
 
+        // Only validate paths with 2 or more tiles
+        if (this.selectedPath.length < 2) {
+            // Single tile selection - clear path without penalty
+            this.clearPath();
+            return;
+        }
+
         if (this.isValidPath()) {
             this.processValidPath();
         } else {
